@@ -18,7 +18,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+import { chromium, request } from 'playwright'
 import { pageExtract, pageCard } from './extract.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -89,22 +89,66 @@ async function newContext(host) {
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, '').replace(/^m\./, '') } catch { return '' } }
 
 // ------------------------------------------------------------------ extraction
+/**
+ * NYT is fetched as a plain HTTP request carrying the exported session
+ * cookies, never rendered live: the bot wall fingerprints headless Chromium
+ * and blocks it, but a cookie-bearing request with the same user-agent the
+ * session was created under is just a subscriber loading a page. The HTML is
+ * server-rendered with the full article body for subscribers, so it is then
+ * parsed offline in a blank page with no network at all.
+ */
+async function fetchNytHtml(url) {
+  const uaFile = path.join(path.dirname(NYT_STATE), 'nyt-ua.txt')
+  const ua = fs.existsSync(uaFile) ? fs.readFileSync(uaFile, 'utf8').trim() : UA
+  const req = await request.newContext({
+    storageState: NYT_STATE,
+    userAgent: ua,
+    extraHTTPHeaders: {
+      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'accept-language': 'en-US,en;q=0.9',
+      'sec-fetch-dest': 'document', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'none', 'upgrade-insecure-requests': '1',
+    },
+  })
+  try {
+    const res = await req.get(url, { maxRedirects: 8, timeout: 30000 })
+    const html = await res.text()
+    if (/captcha-delivery\.com|suspect that you're a robot|Access to this page has been denied/i.test(html)) {
+      throw new Error('nyt: bot block on the plain fetch; rerun nyt-login.mjs')
+    }
+    if (!res.ok()) throw new Error(`nyt: http ${res.status()}`)
+    return { html, finalUrl: res.url() }
+  } finally {
+    await req.dispose()
+  }
+}
+
 async function renderArticle(url) {
   const host = hostOf(url)
   const ctx = await newContext(host)
   try {
     const page = await ctx.newPage()
     page.setDefaultTimeout(30000)
-    await page.goto(url, { waitUntil: 'domcontentloaded' })
-    if (host === 'nytimes.com') {
-      await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"]', { timeout: 20000 }).catch(() => {})
-      await page.waitForTimeout(1200)
+    let finalUrl = url
+    if (host === 'nytimes.com' && fs.existsSync(NYT_STATE)) {
+      const got = await fetchNytHtml(url)
+      finalUrl = got.finalUrl
+      // Parse offline: no scripts run, nothing loads. <base> keeps relative urls resolvable.
+      await page.route('**/*', (route) => route.abort())
+      const html = got.html.replace(/<head([^>]*)>/i, `<head$1><base href="${finalUrl}">`)
+      await page.setContent(html, { waitUntil: 'domcontentloaded' })
     } else {
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
+      await page.goto(url, { waitUntil: 'domcontentloaded' })
+      if (host === 'nytimes.com') {
+        await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"]', { timeout: 20000 }).catch(() => {})
+        await page.waitForTimeout(1200)
+      } else {
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
+      }
+      finalUrl = page.url()
     }
     await page.addScriptTag({ path: READABILITY })
     const r = await page.evaluate(pageExtract, { host })
-    r.finalUrl = page.url()
+    r.finalUrl = finalUrl
     return r
   } finally {
     await ctx.close()
