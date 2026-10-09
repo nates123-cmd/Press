@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Paper square, a masthead rule, the red full stop. -->
+  <rect width="512" height="512" fill="#F6F3EC"/>
+  <rect x="88" y="128" width="336" height="14" fill="#161512"/>
+  <rect x="88" y="172" width="240" height="14" fill="#161512"/>
+  <rect x="88" y="216" width="288" height="14" fill="#161512"/>
+  <rect x="88" y="260" width="200" height="14" fill="#161512"/>
+  <rect x="88" y="304" width="312" height="14" fill="#161512"/>
+  <circle cx="394" cy="384" r="30" fill="#C8102E"/>
+</svg>

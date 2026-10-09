@@ -1,0 +1,17 @@
+{
+  "name": "press-fetcher",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Beelink worker: turns pending Press links into clean cached articles with Playwright.",
+  "scripts": {
+    "start": "node fetch.mjs",
+    "once": "node fetch.mjs --once",
+    "try": "node fetch.mjs --url",
+    "nyt-login": "node ../scripts/nyt-login.mjs"
+  },
+  "dependencies": {
+    "@mozilla/readability": "0.6.0",
+    "playwright": "1.64.0"
+  }
+}

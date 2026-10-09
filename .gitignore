@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+fetcher/node_modules
+fetcher/state/
+fetcher/nyt-state.json
+poller/chatdb-dump
+poller/state.json
+supabase/.temp
+supabase/.branches

@@ -1,0 +1,17 @@
+# ~/apps/press-fetcher on the Beelink.
+#   press.env: SUPABASE_URL, SUPABASE_SERVICE_KEY, POLL_SECONDS=60
+#   state/nyt-state.json: Playwright storageState from scripts/nyt-login.mjs (chmod 600)
+# docker compose up -d --build && docker logs -f press-fetcher
+services:
+  press-fetcher:
+    build: .
+    container_name: press-fetcher
+    restart: unless-stopped
+    env_file: press.env
+    init: true
+    shm_size: 1gb
+    volumes:
+      - ./state:/app/state:ro
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
