@@ -267,6 +267,7 @@ def main(argv):
                 return 1
             raise
     if not rows:
+        log('pass done: nothing new past rowid %d' % state['last_rowid'])
         return
     store = Store(dry)
     n_links = n_new = 0
