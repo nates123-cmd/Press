@@ -14,9 +14,17 @@ LABEL="com.nate.press-poller"
 mkdir -p "$APP" "$HOME/.local/state/press-poller"
 chmod 700 "$APP"
 
-if [[ "${1:-}" == "--build" || ! -x "$APP/chatdb-dump" ]]; then
-  echo "compiling chatdb-dump (grant it Full Disk Access afterwards)"
+BUNDLE="$APP/Press Poller.app"
+if [[ "${1:-}" == "--build" || ! -x "$BUNDLE/Contents/MacOS/chatdb-dump" ]]; then
+  echo "compiling chatdb-dump and wrapping it as Press Poller.app (grant the app Full Disk Access afterwards)"
   cc -O2 -Wall -o "$APP/chatdb-dump" "$HERE/chatdb-dump.c" -lsqlite3
+  # An app bundle, because System Settings on macOS 26 would not reliably add a
+  # bare executable to Full Disk Access. The ad-hoc signature's identity changes
+  # on every rebuild, which is why --build is opt-in.
+  mkdir -p "$BUNDLE/Contents/MacOS"
+  cp "$APP/chatdb-dump" "$BUNDLE/Contents/MacOS/chatdb-dump"
+  cp "$HERE/Info.plist" "$BUNDLE/Contents/Info.plist"
+  codesign --force --deep -s - -i com.nate.press-poller "$BUNDLE"
 fi
 
 cp "$HERE/press_poller.py" "$APP/press_poller.py"
@@ -36,5 +44,5 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "loaded $LABEL; log: ~/.local/state/press-poller/poller.log"
 echo
 echo "If the log says 'authorization denied': System Settings > Privacy & Security >"
-echo "Full Disk Access > + > Cmd+Shift+G > paste:"
-echo "  $APP/chatdb-dump"
+echo "Full Disk Access, then drag this app onto the list (or + and pick it):"
+echo "  $BUNDLE"

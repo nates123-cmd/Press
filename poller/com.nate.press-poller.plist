@@ -12,7 +12,7 @@
        Both live in Application Support, not the repo; install.sh copies them. -->
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/natestephenson/Library/Application Support/press-poller/chatdb-dump</string>
+    <string>/Users/natestephenson/Library/Application Support/press-poller/Press Poller.app/Contents/MacOS/chatdb-dump</string>
     <string>--launch</string>
     <string>3184</string>
   </array>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- chatdb-dump wrapped as an app bundle. System Settings on macOS 26 would
+       not add a bare Mach-O to Full Disk Access reliably; it always adds an
+       app. install.sh assembles "Press Poller.app" from this and the binary. -->
+  <key>CFBundleIdentifier</key><string>com.nate.press-poller</string>
+  <key>CFBundleName</key><string>Press Poller</string>
+  <key>CFBundleExecutable</key><string>chatdb-dump</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>LSUIElement</key><true/>
+</dict>
+</plist>
