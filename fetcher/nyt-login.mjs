@@ -2,7 +2,7 @@
 /**
  * One-time NYT login for the Beelink fetcher. Run on the Mac:
  *
- *   cd fetcher && npm install && npx playwright install chromium && node ../scripts/nyt-login.mjs
+ *   cd fetcher && npm install && npx playwright install chromium && node nyt-login.mjs
  *
  * Opens a real Chromium window on the NYT login page. Sign in, and as soon as
  * the NYT-S session cookie appears the script saves a Playwright storageState
@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const out = path.join(here, '../fetcher/state/nyt-state.json')
+const out = path.join(here, 'state/nyt-state.json')
 fs.mkdirSync(path.dirname(out), { recursive: true })
 
 const browser = await chromium.launch({ headless: false, args: ['--disable-blink-features=AutomationControlled'] })

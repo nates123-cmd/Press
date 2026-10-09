@@ -17,7 +17,7 @@ iMessage group chat (chat.db on Nate's Mac)
 
 - **Only the Mac can read chat.db.** A closed laptop is a delay, not a loss:
   the poller keeps a ROWID watermark and catches up on wake.
-- **NYT needs a session.** `scripts/nyt-login.mjs` opens a real browser once,
+- **NYT needs a session.** `fetcher/nyt-login.mjs` opens a real browser once,
   you sign in, it saves `fetcher/state/nyt-state.json`, you scp it to the
   Beelink. Until then NYT rows stay pending and untouched.
 - **Comments anchor to text**, not DOM paths: quote plus 32 chars of context
@@ -35,7 +35,7 @@ iMessage group chat (chat.db on Nate's Mac)
 | `supabase/migrations/` | Schema, RLS, the auth trigger, the seed. Applied with `supabase db query --linked -f <file>`. |
 | `poller/` | Mac side: `chatdb-dump.c`, `press_poller.py`, the launchd plist, `install.sh`. |
 | `fetcher/` | Beelink side: `fetch.mjs` (queue loop), `extract.mjs` (runs in-page), Dockerfile, compose. |
-| `scripts/` | `invite.mjs`, `nyt-login.mjs`, `dev-link.mjs` (one-shot sign-in link for local dev). |
+| `scripts/` | `invite.mjs`, `dev-link.mjs` (one-shot sign-in link for local dev). |
 | `DESIGN.md` | The look. Read it before touching CSS. |
 
 ## Running

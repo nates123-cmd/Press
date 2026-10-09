@@ -8,7 +8,7 @@
     "start": "node fetch.mjs",
     "once": "node fetch.mjs --once",
     "try": "node fetch.mjs --url",
-    "nyt-login": "node ../scripts/nyt-login.mjs"
+    "nyt-login": "node nyt-login.mjs"
   },
   "dependencies": {
     "@mozilla/readability": "0.6.0",
