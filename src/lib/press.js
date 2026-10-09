@@ -28,7 +28,7 @@ const FEED_COLS = `id, url, canonical_url, site, kind, status, title, byline, de
 export async function loadFeed() {
   const { data, error } = await supabase.from('articles').select(FEED_COLS).order('created_at', { ascending: false }).limit(400)
   if (error) throw error
-  for (const a of data) a.latest_share = a.shares.reduce((m, s) => (s.shared_at > m ? s.shared_at : m), a.created_at)
+  for (const a of data) a.latest_share = a.shares.length ? a.shares.reduce((m, s) => (s.shared_at > m ? s.shared_at : m), '') : a.created_at
   data.sort((a, b) => (a.latest_share < b.latest_share ? 1 : -1))
   return data
 }

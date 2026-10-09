@@ -251,7 +251,14 @@ def main(argv):
     if '--since-rowid' in argv:
         state['last_rowid'] = int(argv[argv.index('--since-rowid') + 1])
 
-    rows = dump_messages(int(ENV['PRESS_CHAT_ROWID']), state['last_rowid'])
+    try:
+        rows = dump_messages(int(ENV['PRESS_CHAT_ROWID']), state['last_rowid'])
+    except RuntimeError as e:
+        if 'authorization denied' in str(e):
+            log('chatdb-dump has no Full Disk Access yet. System Settings > Privacy & Security >'
+                ' Full Disk Access > + > Cmd+Shift+G >', DUMP_BIN)
+            return 1
+        raise
     if not rows:
         return
     store = Store(dry)

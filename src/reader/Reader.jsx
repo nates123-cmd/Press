@@ -3,7 +3,7 @@ import { usePress } from '../App'
 import { loadArticle, loadComments, subscribeComments, upsertRead, addComment, editComment, deleteComment, resolveComment } from '../lib/press'
 import { indexText, locate, markRange, clearMarks, anchorFromRange } from '../lib/anchor'
 import { Rail, ThreadCard, DraftCard } from './Rail'
-import { ago, prettyUrl } from '../components/Feed'
+import { agoPhrase, prettyUrl } from '../components/Feed'
 import { initials } from '../components/Me'
 
 function useMedia(q) {
@@ -180,7 +180,7 @@ export function Reader({ id }) {
                 <div className="share-line" key={s.id} style={{ '--who': p?.color }}>
                   <span className="avatar">{initials(p)}</span>
                   <div>
-                    <div className="share-who"><b>{p?.display_name || 'Someone'}</b> sent this {ago(s.shared_at)} ago</div>
+                    <div className="share-who"><b>{p?.display_name || 'Someone'}</b> sent this {agoPhrase(s.shared_at)}</div>
                     {s.note && <p className="share-note">{s.note}</p>}
                   </div>
                 </div>

@@ -16,6 +16,12 @@ export function ago(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/* "3h ago" while it is recent, "on Sep 23" once it is not. */
+export function agoPhrase(iso) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000
+  return s < 86400 * 14 ? `${ago(iso)} ago` : `on ${ago(iso)}`
+}
+
 export function Feed() {
   const { me, byId } = usePress()
   const [rows, setRows] = useState(null)

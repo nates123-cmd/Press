@@ -112,6 +112,13 @@ async function renderArticle(url) {
 }
 
 async function renderCard(url) {
+  // Short links (reddit.com/r/x/s/abc, youtu.be) redirect; oEmbed wants the real url.
+  if (/reddit\.com\/r\/[^/]+\/s\//.test(url)) {
+    try {
+      const res = await fetch(url, { method: 'HEAD', redirect: 'follow', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000) })
+      if (res.url) url = res.url.split('?')[0]
+    } catch {}
+  }
   const host = hostOf(url)
   const oembed = OEMBED[host]
   if (oembed) {

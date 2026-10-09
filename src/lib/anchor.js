@@ -7,10 +7,10 @@
 
 const CONTEXT = 32
 
+/* Every text node, no filtering: the offsets below are measured with
+ * Range.toString(), which counts every text node too, so the two must agree. */
 function* textNodes(root) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.parentElement && n.parentElement.closest('figcaption, script, style') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
-  })
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let n
   while ((n = walker.nextNode())) yield n
 }
@@ -26,24 +26,26 @@ export function indexText(root) {
   return { text, nodes }
 }
 
-function offsetOf(index, node, offset) {
-  // node may be an element (selection landed on a boundary); resolve to a text position
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const child = node.childNodes[offset] || node.childNodes[node.childNodes.length - 1]
-    if (!child) return null
-    for (const e of index.nodes) if (child === e.node || child.contains?.(e.node)) return offset < node.childNodes.length ? e.start : e.end
-    return null
-  }
-  for (const e of index.nodes) if (e.node === node) return e.start + offset
-  return null
+/* Text offset of a boundary point: the length of everything from the start
+ * of root up to it. Works whether the point is in a text node, an element
+ * with no text (a figure), or the root itself. */
+function offsetOf(root, node, offset) {
+  const r = document.createRange()
+  r.setStart(root, 0)
+  try { r.setEnd(node, offset) } catch { return null }
+  return r.toString().length
 }
 
 /** From a live Selection range inside root to a storable anchor. */
 export function anchorFromRange(root, range) {
   const index = indexText(root)
-  const a = offsetOf(index, range.startContainer, range.startOffset)
-  const b = offsetOf(index, range.endContainer, range.endOffset)
-  if (a == null || b == null || b <= a) return null
+  let a = offsetOf(root, range.startContainer, range.startOffset)
+  let b = offsetOf(root, range.endContainer, range.endOffset)
+  if (a == null || b == null) return null
+  // Trim whitespace off both ends so a triple-click never anchors on the newline that follows.
+  while (a < b && /\s/.test(index.text[a])) a++
+  while (b > a && /\s/.test(index.text[b - 1])) b--
+  if (b <= a) return null
   const quote = index.text.slice(a, b)
   if (!quote.trim()) return null
   return {

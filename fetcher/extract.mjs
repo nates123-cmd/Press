@@ -36,9 +36,10 @@ export function pageExtract({ host }) {
   const bestSrc = (img) => {
     const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset')
     if (srcset) {
-      const cands = srcset.split(',').map((s) => s.trim().split(/\s+/)).filter((c) => c[0])
-      cands.sort((a, b) => (parseInt(b[1]) || 0) - (parseInt(a[1]) || 0))
-      if (cands[0]) return cands[0][0]
+      // Never split on commas: CDN urls (Substack, Cloudinary) carry commas inside the path.
+      const cands = Array.from(srcset.matchAll(/(\S+)\s+(\d+(?:\.\d+)?)[wx](?:\s*,|\s*$)/g)).map((m) => [m[1], parseFloat(m[2])])
+      cands.sort((a, b) => b[1] - a[1])
+      if (cands[0] && /^(https?:)?\/\//.test(cands[0][0])) return cands[0][0]
     }
     return img.getAttribute('src') || img.getAttribute('data-src') || ''
   }
@@ -141,6 +142,12 @@ export function pageExtract({ host }) {
     const c = common()
     if (!window.Readability) return { error: 'readability not injected' }
     const doc = document.cloneNode(true)
+    // Site chrome that Readability keeps because it is dense with text.
+    const PRE_DROP = ['.infobox', '.navbox', '.vertical-navbox', '.sidebar', '.mw-editsection', '.hatnote', '.reflist',
+      '.mw-jump-link', '#toc', '.toc', '.metadata', '.ambox', '.shortdescription', '.mw-empty-elt', '.noprint',
+      '.subscription-widget-wrap', '.subscribe-widget', '.button-wrapper', '.pencraft.pc-display-flex',
+      '[class*="paywall"]', '[class*="subscribe"]', '[id*="newsletter"]', '.share-dialog', '[data-component="newsletter"]']
+    for (const sel of PRE_DROP) for (const el of Array.from(doc.querySelectorAll(sel))) el.remove()
     const art = new window.Readability(doc, { keepClasses: false }).parse()
     if (!art || !art.content) return { error: 'readability: nothing parsed' }
     const holder = document.createElement('div')
