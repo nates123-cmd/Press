@@ -5,12 +5,16 @@
   <key>Label</key>
   <string>com.nate.press-poller</string>
 
-  <!-- The script lives in Application Support, not the repo, so a checkout
-       move never breaks the agent. install.sh copies it there. -->
+  <!-- chatdb-dump is the main executable on purpose: TCC grants Full Disk
+       Access to the process launchd starts and credits its children to it, so
+       python3 as the parent would be denied no matter what the child is
+       granted. The binary dumps the chat, then execs the Python poller.
+       Both live in Application Support, not the repo; install.sh copies them. -->
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/python3</string>
-    <string>/Users/natestephenson/Library/Application Support/press-poller/press_poller.py</string>
+    <string>/Users/natestephenson/Library/Application Support/press-poller/chatdb-dump</string>
+    <string>--launch</string>
+    <string>3184</string>
   </array>
 
   <!-- Every 5 minutes. One pass, one SQLite read through chatdb-dump, a

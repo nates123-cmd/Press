@@ -251,14 +251,21 @@ def main(argv):
     if '--since-rowid' in argv:
         state['last_rowid'] = int(argv[argv.index('--since-rowid') + 1])
 
-    try:
-        rows = dump_messages(int(ENV['PRESS_CHAT_ROWID']), state['last_rowid'])
-    except RuntimeError as e:
-        if 'authorization denied' in str(e):
-            log('chatdb-dump has no Full Disk Access yet. System Settings > Privacy & Security >'
-                ' Full Disk Access > + > Cmd+Shift+G >', DUMP_BIN)
-            return 1
-        raise
+    if '--from-file' in argv:
+        # launchd path: chatdb-dump --launch already wrote the whole chat and exec'd us.
+        path = argv[argv.index('--from-file') + 1]
+        with open(path) as f:
+            rows = [json.loads(line) for line in f if line.strip()]
+        rows = [r for r in rows if r['rowid'] > state['last_rowid']]
+    else:
+        try:
+            rows = dump_messages(int(ENV['PRESS_CHAT_ROWID']), state['last_rowid'])
+        except RuntimeError as e:
+            if 'authorization denied' in str(e):
+                log('chatdb-dump has no Full Disk Access yet. System Settings > Privacy & Security >'
+                    ' Full Disk Access > + > Cmd+Shift+G >', DUMP_BIN)
+                return 1
+            raise
     if not rows:
         return
     store = Store(dry)
