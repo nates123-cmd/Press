@@ -42,6 +42,13 @@ cp "$HERE/com.nate.press-poller.plist" "$PLIST"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 echo "loaded $LABEL; log: ~/.local/state/press-poller/poller.log"
+
+# The NYT reader: real Chrome, every 5 minutes, from the checkout.
+NYT_PLIST="$HOME/Library/LaunchAgents/com.nate.press-nyt.plist"
+cp "$HERE/com.nate.press-nyt.plist" "$NYT_PLIST"
+launchctl bootout "gui/$(id -u)/com.nate.press-nyt" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$NYT_PLIST"
+echo "loaded com.nate.press-nyt; log: ~/.local/state/press-poller/nyt.log"
 echo
 echo "If the log says 'authorization denied': System Settings > Privacy & Security >"
 echo "Full Disk Access, then drag this app onto the list (or + and pick it):"

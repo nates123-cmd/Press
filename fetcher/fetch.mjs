@@ -18,12 +18,23 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, request } from 'playwright'
+import os from 'node:os'
+import { chromium } from 'playwright'
 import { pageExtract, pageCard } from './extract.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const READABILITY = path.join(here, 'node_modules/@mozilla/readability/Readability.js')
 const ENV = process.env
+// On the Mac (the --nyt-local job) the keys live with the poller, not in the environment.
+if (!ENV.SUPABASE_URL) {
+  const envPath = path.join(os.homedir(), 'Library/Application Support/press-poller/.env')
+  if (fs.existsSync(envPath)) {
+    for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/)
+      if (m && !ENV[m[1]]) ENV[m[1]] = m[2]
+    }
+  }
+}
 const NYT_STATE = ENV.NYT_STATE || path.join(here, 'state/nyt-state.json')
 const POLL = Number(ENV.POLL_SECONDS || 60) * 1000
 const MAX_ATTEMPTS = Number(ENV.MAX_ATTEMPTS || 5)
@@ -89,75 +100,94 @@ async function newContext(host) {
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, '').replace(/^m\./, '') } catch { return '' } }
 
 // ------------------------------------------------------------------ extraction
-/**
- * NYT is fetched as a plain HTTP request carrying the exported session
- * cookies, never rendered live: the bot wall fingerprints headless Chromium
- * and blocks it, but a cookie-bearing request with the same user-agent the
- * session was created under is just a subscriber loading a page. The HTML is
- * server-rendered with the full article body for subscribers, so it is then
- * parsed offline in a blank page with no network at all.
- */
-async function fetchNytHtml(url) {
-  const uaFile = path.join(path.dirname(NYT_STATE), 'nyt-ua.txt')
-  const ua = fs.existsSync(uaFile) ? fs.readFileSync(uaFile, 'utf8').trim() : UA
-  const req = await request.newContext({
-    storageState: NYT_STATE,
-    userAgent: ua,
-    extraHTTPHeaders: {
-      accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'accept-language': 'en-US,en;q=0.9',
-      'sec-fetch-dest': 'document', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'none', 'upgrade-insecure-requests': '1',
-    },
-  })
-  try {
-    // A subscriber does not open six articles in six seconds.
-    await new Promise((r) => setTimeout(r, 2500 + Math.random() * 3500))
-    const res = await req.get(url, { maxRedirects: 8, timeout: 30000 })
-    const html = await res.text()
-    if (/captcha-delivery\.com|suspect that you're a robot|Access to this page has been denied/i.test(html)) {
-      throw new Error('nyt: bot block on the plain fetch; rerun nyt-login.mjs')
-    }
-    if (!res.ok()) throw new Error(`nyt: http ${res.status()}`)
-    // The bot wall rotates its cookie on every response; keep the fresh one or
-    // the next request looks like a replay.
-    await req.storageState({ path: NYT_STATE }).catch(() => {})
-    return { html, finalUrl: res.url() }
-  } finally {
-    await req.dispose()
-  }
-}
-
 async function renderArticle(url) {
   const host = hostOf(url)
   const ctx = await newContext(host)
   try {
     const page = await ctx.newPage()
     page.setDefaultTimeout(30000)
-    let finalUrl = url
-    if (host === 'nytimes.com' && fs.existsSync(NYT_STATE)) {
-      const got = await fetchNytHtml(url)
-      finalUrl = got.finalUrl
-      // Parse offline: no scripts run, nothing loads. <base> keeps relative urls resolvable.
-      await page.route('**/*', (route) => route.abort())
-      const html = got.html.replace(/<head([^>]*)>/i, `<head$1><base href="${finalUrl}">`)
-      await page.setContent(html, { waitUntil: 'domcontentloaded' })
-    } else {
-      await page.goto(url, { waitUntil: 'domcontentloaded' })
-      if (host === 'nytimes.com') {
-        await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"]', { timeout: 20000 }).catch(() => {})
-        await page.waitForTimeout(1200)
-      } else {
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
-      }
-      finalUrl = page.url()
-    }
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
     await page.addScriptTag({ path: READABILITY })
     const r = await page.evaluate(pageExtract, { host })
-    r.finalUrl = finalUrl
+    r.finalUrl = page.url()
     return r
   } finally {
     await ctx.close()
   }
+}
+
+// ------------------------------------------------------------------ NYT, on the Mac
+/**
+ * NYT is read by the real Google Chrome on Nate's Mac, with the profile that
+ * nyt-login.mjs signed in (state/chrome-profile). Nothing else gets past the
+ * NYT bot wall: it blocks Playwright's own Chromium headed or headless, and a
+ * plain HTTP request with the session cookies works for a few pages and then
+ * gets flagged. A real browser with a real login is just a subscriber reading.
+ *
+ * Runs every five minutes from launchd (poller/com.nate.press-nyt.plist):
+ *   node fetch.mjs --nyt-local
+ * The Beelink fetcher never touches nytimes.com.
+ */
+async function nytLocalPass() {
+  const profile = path.join(here, 'state/chrome-profile')
+  if (!fs.existsSync(profile)) { log('nyt-local: no chrome profile; run nyt-login.mjs first'); return 0 }
+  const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&site=eq.nytimes.com&attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=8`, undefined, 'return=representation')
+  if (!rows?.length) { log('nyt-local: nothing pending'); return 0 }
+  const headless = (ENV.NYT_HEADLESS || 'true') !== 'false'
+  const ctx = await chromium.launchPersistentContext(profile, {
+    channel: 'chrome',
+    headless,
+    viewport: { width: 1280, height: 900 },
+    ignoreDefaultArgs: ['--enable-automation'],
+    args: ['--disable-blink-features=AutomationControlled', '--no-first-run', '--no-default-browser-check',
+      ...(headless ? [] : ['--window-position=-32000,-32000'])],
+  })
+  let done = 0
+  try {
+    for (const a of rows) {
+      const page = await ctx.newPage()
+      page.setDefaultTimeout(30000)
+      try {
+        await page.goto(a.url, { waitUntil: 'domcontentloaded' })
+        await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"]', { timeout: 20000 }).catch(() => {})
+        await page.waitForTimeout(1500)
+        const title = await page.title()
+        if (/blocked|robot|access denied/i.test(title) || await page.$('iframe[src*="captcha-delivery"]')) {
+          log('nyt-local: bot wall on', a.url.slice(0, 80), '- stopping this pass, attempts untouched')
+          break
+        }
+        await page.addScriptTag({ path: READABILITY })
+        const r = await page.evaluate(pageExtract, { host: 'nytimes.com' })
+        if (r.error) throw new Error(r.error)
+        const isArticle = r.wordCount >= 120
+        await sb('PATCH', `articles?id=eq.${a.id}`, {
+          status: isArticle ? 'ready' : 'link_only', kind: isArticle ? 'article' : 'link',
+          title: (r.title || '').slice(0, 500) || null, byline: (r.byline || '').slice(0, 300) || null,
+          dek: (r.dek || '').slice(0, 1000) || null,
+          published_at: r.publishedAt && !Number.isNaN(Date.parse(r.publishedAt)) ? new Date(r.publishedAt).toISOString() : null,
+          hero_image_url: r.heroImage || null, hero_caption: (r.heroCaption || '').slice(0, 1000) || null,
+          content_html: isArticle ? r.html : null, content_text: isArticle ? r.text : null,
+          word_count: isArticle ? r.wordCount : null,
+          attempts: (a.attempts || 0) + 1, fetch_error: null, fetched_at: new Date().toISOString(),
+        })
+        done++
+        log('ready nytimes.com', `${r.wordCount}w`, r.method, (r.title || '').slice(0, 60))
+      } catch (e) {
+        const attempts = (a.attempts || 0) + 1
+        await sb('PATCH', `articles?id=eq.${a.id}`, { attempts, fetch_error: String(e.message).slice(0, 500), status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending' })
+        log('retry nytimes.com', a.url.slice(0, 80), '->', e.message.slice(0, 120))
+      } finally {
+        await page.close().catch(() => {})
+      }
+      // A subscriber does not open eight articles in eight seconds.
+      await new Promise((r) => setTimeout(r, 3000 + Math.random() * 4000))
+    }
+  } finally {
+    await ctx.close().catch(() => {})
+  }
+  log('nyt-local: pass done,', done, 'of', rows.length)
+  return done
 }
 
 async function renderCard(url) {
@@ -229,17 +259,19 @@ async function processOne(a) {
 }
 
 async function pass() {
-  // Without an NYT session every NYT fetch is a guaranteed paywall: leave
-  // those rows pending and untouched until scripts/nyt-login.mjs has run.
-  const nytOk = fs.existsSync(NYT_STATE)
-  const skip = nytOk ? '' : '&site=neq.nytimes.com'
-  const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&attempts=lt.${MAX_ATTEMPTS}${skip}&order=created_at.asc&limit=6`, undefined, 'return=representation')
+  // nytimes.com is never fetched here: see nytLocalPass, it runs on the Mac.
+  const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&attempts=lt.${MAX_ATTEMPTS}&site=neq.nytimes.com&order=created_at.asc&limit=6`, undefined, 'return=representation')
   for (const a of rows || []) await processOne(a)
   return (rows || []).length
 }
 
 async function main() {
   const argv = process.argv.slice(2)
+  if (argv.includes('--nyt-local')) {
+    const n = await nytLocalPass()
+    log('nyt-local: processed', n)
+    return
+  }
   if (argv[0] === '--url') {
     const url = argv[1]
     const host = hostOf(url)

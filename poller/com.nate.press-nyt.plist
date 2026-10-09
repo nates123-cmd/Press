@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nate.press-nyt</string>
+
+  <!-- NYT articles are read by the real Google Chrome on this Mac, signed in
+       through fetcher/nyt-login.mjs (profile under fetcher/state). The bot
+       wall blocks everything else. Runs from the checkout because the
+       Playwright install and the Chrome profile live there. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/natestephenson/Developer/press/fetcher/fetch.mjs</string>
+    <string>--nyt-local</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/natestephenson/Developer/press/fetcher</string>
+
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/natestephenson/.local/state/press-poller/nyt.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/natestephenson/.local/state/press-poller/nyt.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>NYT_HEADLESS</key>
+    <string>true</string>
+  </dict>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
