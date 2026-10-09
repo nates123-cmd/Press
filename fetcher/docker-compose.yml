@@ -11,7 +11,7 @@ services:
     init: true
     shm_size: 1gb
     volumes:
-      - ./state:/app/state:ro
+      - ./state:/app/state   # read-write: the fetcher refreshes the bot wall's rotating cookie
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

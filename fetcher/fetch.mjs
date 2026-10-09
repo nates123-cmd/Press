@@ -110,12 +110,17 @@ async function fetchNytHtml(url) {
     },
   })
   try {
+    // A subscriber does not open six articles in six seconds.
+    await new Promise((r) => setTimeout(r, 2500 + Math.random() * 3500))
     const res = await req.get(url, { maxRedirects: 8, timeout: 30000 })
     const html = await res.text()
     if (/captcha-delivery\.com|suspect that you're a robot|Access to this page has been denied/i.test(html)) {
       throw new Error('nyt: bot block on the plain fetch; rerun nyt-login.mjs')
     }
     if (!res.ok()) throw new Error(`nyt: http ${res.status()}`)
+    // The bot wall rotates its cookie on every response; keep the fresh one or
+    // the next request looks like a replay.
+    await req.storageState({ path: NYT_STATE }).catch(() => {})
     return { html, finalUrl: res.url() }
   } finally {
     await req.dispose()
