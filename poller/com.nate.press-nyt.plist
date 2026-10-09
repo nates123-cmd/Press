@@ -32,8 +32,9 @@
   <dict>
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <!-- Headed, window parked offscreen: the bot wall detects headless Chrome. -->
     <key>NYT_HEADLESS</key>
-    <string>true</string>
+    <string>false</string>
   </dict>
   <key>ProcessType</key>
   <string>Background</string>

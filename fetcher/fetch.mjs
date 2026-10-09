@@ -134,7 +134,8 @@ async function nytLocalPass() {
   if (!fs.existsSync(profile)) { log('nyt-local: no chrome profile; run nyt-login.mjs first'); return 0 }
   const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&site=eq.nytimes.com&attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=8`, undefined, 'return=representation')
   if (!rows?.length) { log('nyt-local: nothing pending'); return 0 }
-  const headless = (ENV.NYT_HEADLESS || 'true') !== 'false'
+  // Headed by default, window parked offscreen: the wall detects headless Chrome (tested 2026-10-09).
+  const headless = ENV.NYT_HEADLESS === 'true'
   const ctx = await chromium.launchPersistentContext(profile, {
     channel: 'chrome',
     headless,
@@ -153,8 +154,11 @@ async function nytLocalPass() {
         await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"]', { timeout: 20000 }).catch(() => {})
         await page.waitForTimeout(1500)
         const title = await page.title()
-        if (/blocked|robot|access denied/i.test(title) || await page.$('iframe[src*="captcha-delivery"]')) {
-          log('nyt-local: bot wall on', a.url.slice(0, 80), '- stopping this pass, attempts untouched')
+        const walled = /you have been blocked|suspect that you're a robot|access denied/i.test(title) || await page.$('iframe[src*="captcha-delivery"]')
+        if (walled) {
+          log('nyt-local: bot wall on', a.url.slice(0, 80), `(title: ${title.slice(0, 60)}) - stopping this pass, attempts untouched`)
+          // The wall's cookie is now poisoned; drop it so the next pass starts clean.
+          await ctx.clearCookies({ name: 'datadome' }).catch(() => {})
           break
         }
         await page.addScriptTag({ path: READABILITY })
