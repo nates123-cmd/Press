@@ -1,7 +1,7 @@
 /* Press service worker. Cache-first for the app shell, network for everything
  * else (Supabase, fonts, hotlinked images). Bump VERSION on every ship: the
  * launch right after a deploy still shows the old shell, the next one the new. */
-const VERSION = 'press-v8'
+const VERSION = 'press-v9'
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg']
 
 self.addEventListener('install', (e) => {

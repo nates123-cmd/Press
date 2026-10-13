@@ -23,7 +23,7 @@ export async function updateMe(id, patch) {
 const FEED_COLS = `id, url, canonical_url, site, kind, status, title, byline, dek, published_at, hero_image_url, word_count, created_at,
   shares (id, profile_id, note, shared_at, visibility),
   comments (id, author_id, parent_id, created_at, resolved_at),
-  reads (profile_id, read_at, last_seen_at)`
+  reads (profile_id, read_at, last_seen_at, dismissed_at)`
 
 export async function loadFeed() {
   const { data, error } = await supabase.from('articles').select(FEED_COLS).order('created_at', { ascending: false }).limit(400)

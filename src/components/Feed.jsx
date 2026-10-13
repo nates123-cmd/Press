@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePress, go } from '../App'
-import { loadFeed, subscribeFeed, shareUrl } from '../lib/press'
+import { loadFeed, subscribeFeed, shareUrl, upsertRead } from '../lib/press'
 import { Avatar } from './Me'
+
+const SWIPE = 88 // px of travel that commits a swipe
 
 const TABS = [
   { key: 'unread', label: 'Unread' },
@@ -31,10 +33,27 @@ export function Feed() {
   const [error, setError] = useState(null)
   const [adding, setAdding] = useState(false)
 
+  const [undo, setUndo] = useState({})   // article id -> true while its "Dismissed, undo" line shows
+
   const refresh = useCallback(() => loadFeed().then(setRows).catch((e) => setError(e.message)), [])
   useEffect(() => { refresh() }, [refresh])
   useEffect(() => subscribeFeed(() => refresh()), [refresh])
   useEffect(() => { try { localStorage.setItem('press-tab', tab) } catch {} }, [tab])
+
+  /* Swipes: change the row locally first, then write. A failed write
+   * reloads the feed so the screen never lies for long. */
+  const patchMyRead = useCallback((articleId, patch) => {
+    setRows((rs) => rs && rs.map((a) => {
+      if (a.id !== articleId) return a
+      const others = a.reads.filter((r) => r.profile_id !== me.id)
+      const mine = a.reads.find((r) => r.profile_id === me.id) || { profile_id: me.id, read_at: null, last_seen_at: null, dismissed_at: null }
+      return { ...a, reads: [...others, { ...mine, ...patch }] }
+    }))
+    upsertRead(me.id, articleId, patch).catch(() => refresh())
+  }, [me.id, refresh])
+  const toggleRead = useCallback((a) => patchMyRead(a.id, { read_at: a.isRead ? null : new Date().toISOString() }), [patchMyRead])
+  const dismiss = useCallback((a) => { patchMyRead(a.id, { dismissed_at: new Date().toISOString() }); setUndo((u) => ({ ...u, [a.id]: true })) }, [patchMyRead])
+  const undismiss = useCallback((a) => { patchMyRead(a.id, { dismissed_at: null }); setUndo((u) => { const n = { ...u }; delete n[a.id]; return n }) }, [patchMyRead])
 
   const decorated = useMemo(() => {
     if (!rows) return null
@@ -51,6 +70,7 @@ export function Feed() {
           inGroup: group.length > 0,
           inMine: personal.length > 0,
           isRead: !!mine?.read_at,
+          isDismissed: !!mine?.dismissed_at,
           isLink: a.kind === 'link' || a.status === 'link_only',
           newComments: live.filter((c) => c.created_at > seen && c.author_id !== me.id).length,
           commentCount: live.length,
@@ -60,9 +80,10 @@ export function Feed() {
         }
       })
       // RLS hides other people's personal shares, so an article with no visible share is theirs alone.
-      .filter((a) => a.inGroup || a.inMine)
+      // A dismissed row stays only while its undo line is showing.
+      .filter((a) => (a.inGroup || a.inMine) && (!a.isDismissed || undo[a.id]))
       .sort((a, b) => (a.latest_share < b.latest_share ? 1 : -1))
-  }, [rows, me.id])
+  }, [rows, me.id, undo])
 
   const visible = useMemo(() => {
     if (!decorated) return []
@@ -105,7 +126,14 @@ export function Feed() {
         </div>
       )}
 
-      {visible.map((a) => <Row key={a.id} a={a} byId={byId} me={me} />)}
+      {visible.map((a) => a.isDismissed
+        ? (
+          <div key={a.id} className="row-undo">
+            <span>Dismissed.</span>
+            <button className="linklike" onClick={() => undismiss(a)}>Undo</button>
+          </div>
+        )
+        : <Row key={a.id} a={a} byId={byId} me={me} onRead={() => toggleRead(a)} onDismiss={() => dismiss(a)} />)}
 
       {adding && <AddSheet me={me} defaultScope={tab === 'mine' ? 'personal' : 'group'} onClose={() => setAdding(false)} onDone={async (id) => { setAdding(false); await refresh(); go(`#/a/${id}`) }} />}
     </main>
@@ -164,7 +192,60 @@ function AddSheet({ me, defaultScope, onClose, onDone }) {
   )
 }
 
-function Row({ a, byId, me }) {
+/* Touch swipes on a row: right marks it read (or unread again), left dismisses.
+ * The row follows the finger once the gesture is clearly sideways; vertical
+ * scrolling is untouched. A committed swipe swallows the click that would
+ * otherwise open the article. */
+function useSwipe({ onRight, onLeft, disabled }) {
+  const ref = useRef(null)
+  const [dx, setDx] = useState(0)
+  const state = useRef({ x: 0, y: 0, axis: null, committed: false })
+  useEffect(() => {
+    const el = ref.current
+    if (!el || disabled) return
+    const start = (e) => {
+      const t = e.touches[0]
+      state.current = { x: t.clientX, y: t.clientY, axis: null, committed: false }
+    }
+    const move = (e) => {
+      const s = state.current
+      const t = e.touches[0]
+      const mx = t.clientX - s.x, my = t.clientY - s.y
+      if (!s.axis) {
+        if (Math.abs(mx) < 8 && Math.abs(my) < 8) return
+        s.axis = Math.abs(mx) > Math.abs(my) * 1.3 ? 'x' : 'y'
+      }
+      if (s.axis !== 'x') return
+      e.preventDefault()
+      const capped = Math.max(-160, Math.min(160, mx))
+      setDx(capped)
+    }
+    const end = () => {
+      const s = state.current
+      if (s.axis === 'x') {
+        if (dxRef.current >= SWIPE) { s.committed = true; onRight() }
+        else if (dxRef.current <= -SWIPE) { s.committed = true; onLeft() }
+      }
+      setDx(0)
+    }
+    const click = (e) => { if (state.current.committed) { e.preventDefault(); e.stopPropagation(); state.current.committed = false } }
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchmove', move, { passive: false })
+    el.addEventListener('touchend', end)
+    el.addEventListener('touchcancel', end)
+    el.addEventListener('click', click, true)
+    return () => {
+      el.removeEventListener('touchstart', start); el.removeEventListener('touchmove', move)
+      el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.removeEventListener('click', click, true)
+    }
+  }, [onRight, onLeft, disabled])
+  const dxRef = useRef(0)
+  dxRef.current = dx
+  return { ref, dx }
+}
+
+function Row({ a, byId, me, onRead, onDismiss }) {
+  const { ref: swipeRef, dx } = useSwipe({ onRight: onRead, onLeft: onDismiss, disabled: !onRead })
   const first = byId[a.sharers[0]]
   const who = a.inGroup
     ? a.sharers.map((id) => byId[id]?.short_name || '?')
@@ -175,10 +256,14 @@ function Row({ a, byId, me }) {
   const failed = a.status === 'failed'
   const external = a.isLink || failed
   const href = external ? a.url : `#/a/${a.id}`
+  const armed = dx >= SWIPE ? 'right' : dx <= -SWIPE ? 'left' : ''
   return (
-    <a className={`row ${a.isRead ? 'is-read' : ''} ${a.hero_image_url ? 'has-thumb' : ''}`} href={href}
+    <div className={`swipe ${dx > 0 ? 'dir-right' : dx < 0 ? 'dir-left' : ''} ${armed}`}>
+      <span className="swipe-label swipe-right">{a.isRead ? 'Unread' : 'Read'}</span>
+      <span className="swipe-label swipe-left">Dismiss</span>
+    <a ref={swipeRef} className={`row ${a.isRead ? 'is-read' : ''} ${a.hero_image_url ? 'has-thumb' : ''}`} href={href}
       target={external ? '_blank' : undefined} rel={external ? 'noopener' : undefined}
-      style={{ '--who': a.inGroup ? first?.color : me.color }}>
+      style={{ '--who': a.inGroup ? first?.color : me.color, transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? 'none' : undefined }}>
       <span className="row-bar" />
       <div>
         <h2 className="row-title">
@@ -203,6 +288,7 @@ function Row({ a, byId, me }) {
       </div>
       {a.hero_image_url && <img className="row-thumb" src={a.hero_image_url} alt="" loading="lazy" />}
     </a>
+    </div>
   )
 }
 
