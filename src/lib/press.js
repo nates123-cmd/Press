@@ -23,7 +23,7 @@ export async function updateMe(id, patch) {
 const FEED_COLS = `id, url, canonical_url, site, kind, status, title, byline, dek, published_at, hero_image_url, word_count, created_at,
   shares (id, profile_id, note, shared_at, visibility),
   comments (id, author_id, parent_id, created_at, resolved_at),
-  reads (profile_id, read_at, last_seen_at, dismissed_at)`
+  reads (profile_id, read_at, last_seen_at, dismissed_at, moved_at)`
 
 export async function loadFeed() {
   const { data, error } = await supabase.from('articles').select(FEED_COLS).order('created_at', { ascending: false }).limit(400)
@@ -88,7 +88,7 @@ export function subscribeFeed(onChange) {
   const ch = supabase
     .channel('feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, onChange)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shares' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'shares' }, onChange)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, onChange)
     .subscribe()
   return () => supabase.removeChannel(ch)
@@ -113,6 +113,19 @@ export async function shareUrl(profileId, rawUrl, note, visibility = 'group') {
   })
   if (error) throw error
   return art.id
+}
+
+/* Delete every share of mine on this article. If nobody else sent it, it
+ * leaves the feed for everyone. */
+export async function deleteMyShares(profileId, articleId) {
+  const { error } = await supabase.from('shares').delete().eq('article_id', articleId).eq('profile_id', profileId)
+  if (error) throw error
+}
+
+/* Flip my own shares of this article between the group feed and Just me. */
+export async function setMyShareVisibility(profileId, articleId, visibility) {
+  const { error } = await supabase.from('shares').update({ visibility }).eq('article_id', articleId).eq('profile_id', profileId)
+  if (error) throw error
 }
 
 /* Also load the article detail's shares with visibility so the reader can say "just you". */
