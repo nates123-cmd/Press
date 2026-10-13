@@ -6,7 +6,7 @@ dist
 *.log
 .DS_Store
 fetcher/node_modules
-fetcher/state/
+fetcher/state
 fetcher/nyt-state.json
 poller/chatdb-dump
 poller/state.json
