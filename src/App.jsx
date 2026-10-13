@@ -23,11 +23,43 @@ function useHashRoute() {
 
 export const go = (to) => { window.location.hash = to }
 
+/* Day and night by the clock, not the OS: white from 7 AM to 7 PM, black
+ * otherwise, checked every minute. A manual pick in the masthead sticks for
+ * the rest of the day and then the clock takes over again. */
+const DAY_START = 7, DAY_END = 19
+const clockTheme = () => { const h = new Date().getHours(); return h >= DAY_START && h < DAY_END ? 'light' : 'dark' }
+function readOverride() {
+  try {
+    const raw = localStorage.getItem('press-theme-override')
+    if (!raw) return null
+    const { theme, day } = JSON.parse(raw)
+    return day === new Date().toDateString() ? theme : null
+  } catch { return null }
+}
+function useDayNight() {
+  const [override, setOverride] = useState(readOverride)
+  const [tick, setTick] = useState(0)
+  useEffect(() => { const t = setInterval(() => setTick((n) => n + 1), 60000); return () => clearInterval(t) }, [])
+  const theme = override || clockTheme()
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme, tick])
+  const toggle = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
+    const sameAsClock = next === clockTheme()
+    try {
+      if (sameAsClock) localStorage.removeItem('press-theme-override')
+      else localStorage.setItem('press-theme-override', JSON.stringify({ theme: next, day: new Date().toDateString() }))
+    } catch {}
+    setOverride(sameAsClock ? null : next)
+  }
+  return { theme, toggle }
+}
+
 function Shell() {
   const [profiles, setProfiles] = useState(null)
   const [meId, setMeId] = useState(null)
   const [error, setError] = useState(null)
   const route = useHashRoute()
+  const { theme, toggle: toggleTheme } = useDayNight()
 
   const refresh = useCallback(async () => {
     try {
@@ -48,7 +80,7 @@ function Shell() {
   if (!ctx.me) {
     return (
       <div className="auth-shell"><div className="auth-col">
-        <h1>The Press</h1>
+        <h1>Press Gang</h1>
         <p className="auth-sub">You are signed in, but this address is not on the Press Gang list yet. Ask Nate to add it.</p>
         <button className="btn" onClick={signOut}>Sign out</button>
       </div></div>
@@ -62,8 +94,9 @@ function Shell() {
         <header className="masthead">
           <div className="masthead-row">
             <span className="caps masthead-left">{today}</span>
-            <h1><a href="#/">The Press</a></h1>
+            <h1><a href="#/">Press Gang</a></h1>
             <nav className="masthead-right">
+              <button className="caps" onClick={toggleTheme} title="Day from 7 AM, night from 7 PM. Click to override until tomorrow.">{theme === 'light' ? 'Night' : 'Day'}</button>
               <a className="caps" href="#/me" style={{ textDecoration: 'none' }}>{ctx.me.short_name}</a>
               <button className="caps" onClick={signOut}>Sign out</button>
             </nav>

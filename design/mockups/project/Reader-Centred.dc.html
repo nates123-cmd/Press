@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Press Gang reader, centred header</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Display&amp;family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;family=Libre+Franklin:wght@400;500;600;700&amp;family=UnifrakturMaguntia&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#326891;text-decoration:none}a:hover{color:#121212}
+</style>
+</helmet>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; background: #FFFFFF; color: #121212; font-family: 'Libre Franklin', Arial, sans-serif; padding: 0 120px; display: flex; flex-direction: column; overflow: hidden;">
+
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #E2E2E2;">
+    <div style="font-family: 'UnifrakturMaguntia', serif; font-size: 26px; line-height: 28px;">Press Gang</div>
+    <div style="display: flex; gap: 16px; align-items: center;">
+      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #727272;">Open at nytimes.com</div>
+      <div style="display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: #326891; border: 1px solid #326891; padding: 6px 11px;">
+        <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4.5h14v9H8l-4 3v-3H3z" stroke-linejoin="round"></path></svg>
+        <span>Comments 1</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width: 640px; margin: 0 auto; width: 100%; text-align: center; padding-top: 34px;">
+    <div style="display: flex; gap: 14px; justify-content: center; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #727272;"><span>Opinion</span><span>October 9, 2026</span></div>
+    <div style="font-family: 'Libre Caslon Display', Georgia, serif; font-size: 46px; line-height: 50px; letter-spacing: -0.01em; margin-top: 14px;">I’m a Child Psychiatrist. Screens Are Not the Problem.</div>
+    <div style="font-family: 'Libre Caslon Text', Georgia, serif; font-style: italic; font-size: 21px; line-height: 30px; color: #363636; margin: 16px auto 0; max-width: 600px;">If we make screens the villain, then we let the people who control children’s health care off the hook for their failures.</div>
+    <div style="margin-top: 20px; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #727272;">By <span style="color: #121212;">Jonathan Slater</span> <span style="color: #E2E2E2; margin: 0 6px;">|</span> 5 min read</div>
+    <div style="width: 60px; border-top: 2px solid #121212; margin: 22px auto 0;"></div>
+    <div style="display: grid; grid-template-columns: 24px 1fr; gap: 10px; text-align: left; margin-top: 22px; align-items: start;">
+      <div style="width: 24px; height: 24px; border-radius: 50%; background: #7A3E8C; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">D</div>
+      <div style="font-size: 13px; color: #727272;"><span style="color: #7A3E8C; font-weight: 600;">Dave</span> sent this 4 days ago</div>
+    </div>
+    <div style="width: 100%; height: 300px; background: #E9E9E9; margin-top: 30px;"></div>
+    <div style="text-align: left; font-size: 12px; line-height: 17px; color: #727272; margin-top: 8px;">Credit: María Hergueta</div>
+    <div style="text-align: left; font-family: 'Libre Caslon Text', Georgia, serif; font-size: 20px; line-height: 32px; margin-top: 34px;"><span style="font-family: 'Libre Caslon Display', Georgia, serif; float: left; font-size: 90px; line-height: 72px; padding: 6px 10px 0 0;">P</span>arents, politicians and best-selling psychologists are increasingly anxious about how much time children and teenagers spend on screens and how it may affect their mental health. In May, the Office of the Surgeon General <span style="color: #326891; text-decoration: underline;">warned about the harms</span> of screen use and called for a limit of two hours a day of screen time at home for children ages 6 to 18.</div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

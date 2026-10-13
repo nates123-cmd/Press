@@ -66,8 +66,13 @@ article is Caslon.
 
 ## Rules
 
-- White. No cream, no tint, no gradient. Dark mode is near-black and
-  off-white with the same structure.
+- White. No cream, no tint, no gradient. Night is near-black and off-white
+  with the same structure.
+- Day and night follow the clock, not the OS: white from 7 AM to 7 PM, black
+  otherwise. The masthead's Day/Night word overrides it until tomorrow.
+- The masthead reads "Press Gang". Three directions were mocked up on the
+  canvas "Press Gang mockups" (A nameplate blackletter, B magazine Caslon
+  caps, C gothic condensed); the app runs A until Nate picks.
 - Rules, not boxes. Hairlines separate; nothing has a border radius; nothing
   has a shadow except the panel's single left hairline.
 - The panel is 420px wide on desktop, the full width on phone, slides in over

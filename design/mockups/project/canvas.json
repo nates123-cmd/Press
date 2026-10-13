@@ -1,0 +1,33 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-13T14:05:00Z" },
+  "title": "Press Gang mockups",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 760, "title": "A. Nameplate, day" },
+    "B-Magazine-Day.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 760, "title": "B. Magazine, day" },
+    "C-Gothic-Day.dc.html": { "x": 2720, "y": 0, "w": 1280, "h": 760, "title": "C. Gothic, day" },
+    "A-Nameplate-Night.dc.html": { "x": 0, "y": 1000, "w": 1280, "h": 760, "title": "A. Nameplate, night" },
+    "B-Magazine-Night.dc.html": { "x": 1360, "y": 1000, "w": 1280, "h": 760, "title": "B. Magazine, night" },
+    "C-Gothic-Night.dc.html": { "x": 2720, "y": 1000, "w": 1280, "h": 760, "title": "C. Gothic, night" },
+    "Reader-Centred.dc.html": { "x": 0, "y": 2000, "w": 1280, "h": 900, "title": "Reader 1. Centred, New Yorker" },
+    "Reader-Left.dc.html": { "x": 1360, "y": 2000, "w": 1280, "h": 900, "title": "Reader 2. Left, Times" }
+  },
+  "order": [
+    "Main.dc.html",
+    "B-Magazine-Day.dc.html",
+    "C-Gothic-Day.dc.html",
+    "A-Nameplate-Night.dc.html",
+    "B-Magazine-Night.dc.html",
+    "C-Gothic-Night.dc.html",
+    "Reader-Centred.dc.html",
+    "Reader-Left.dc.html"
+  ],
+  "notes": {
+    "t1": { "x": 0, "y": -300, "text": "Masthead and feed, day. Pick A, B or C.", "kind": "title1", "maxW": 4000 },
+    "t2": { "x": 0, "y": 700, "text": "The same three after 7 PM.", "kind": "title1", "maxW": 4000 },
+    "t3": { "x": 0, "y": 1700, "text": "Reader header. Pick centred or left.", "kind": "title1", "maxW": 2640 }
+  },
+  "designSystems": []
+}

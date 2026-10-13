@@ -155,7 +155,7 @@ export function Reader({ id }) {
   return (
     <div className="reader" ref={readerRef} onClick={onBodyClick}>
       <div className="reader-top">
-        <a className="back" href="#/">Press</a>
+        <a className="back" href="#/">Press Gang</a>
         <div className="tools">
           <a className="caps" href={a.url} target="_blank" rel="noopener">Open at {a.site}</a>
           {commentsButton}
