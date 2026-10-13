@@ -50,7 +50,7 @@ export function AuthGate({ children }) {
   return (
     <div className="auth-shell">
       <div className="auth-col">
-        <h1>Press<span className="dot">.</span></h1>
+        <h1>The Press</h1>
         <p className="auth-sub">Everything the Press Gang has sent, in one place, with a margin to argue in.</p>
 
         {state === STATES.prompt && (

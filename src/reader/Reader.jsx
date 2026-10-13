@@ -2,42 +2,35 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { usePress } from '../App'
 import { loadArticle, loadComments, subscribeComments, upsertRead, addComment, editComment, deleteComment, resolveComment } from '../lib/press'
 import { indexText, locate, markRange, clearMarks, anchorFromRange } from '../lib/anchor'
-import { Rail, ThreadCard, DraftCard } from './Rail'
+import { Panel } from './Panel'
 import { agoPhrase, prettyUrl } from '../components/Feed'
 import { initials } from '../components/Me'
 
-function useMedia(q) {
-  const [m, setM] = useState(() => window.matchMedia(q).matches)
-  useEffect(() => {
-    const mq = window.matchMedia(q)
-    const on = () => setM(mq.matches)
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
-  }, [q])
-  return m
-}
+const Bubble = () => (
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    <path d="M3 4.5h14v9H8l-4 3v-3H3z" strokeLinejoin="round" />
+  </svg>
+)
 
 export function Reader({ id }) {
   const { me, byId } = usePress()
   const [a, setA] = useState(null)
   const [comments, setComments] = useState([])
   const [error, setError] = useState(null)
-  const [active, setActive] = useState(null)       // comment id, or 'draft'
+  const [panel, setPanel] = useState(false)
+  const [active, setActive] = useState(null)       // thread id
   const [draft, setDraft] = useState(null)         // { quote, prefix, suffix } | { whole: true }
   const [pill, setPill] = useState(null)           // { x, y, anchor }
-  const [positions, setPositions] = useState({})   // comment id -> top within .reader
-  const [sheet, setSheet] = useState(null)         // thread id open in the phone sheet
   const [showResolved, setShowResolved] = useState(false)
   const [readState, setReadState] = useState(null)
   const readerRef = useRef(null)
   const bodyRef = useRef(null)
   const footRef = useRef(null)
-  const isDesktop = useMedia('(min-width: 1040px)')
 
   const reloadComments = useCallback(() => loadComments(id).then(setComments).catch((e) => setError(e.message)), [id])
 
   useEffect(() => {
-    setA(null); setComments([]); setActive(null); setDraft(null); setPill(null); setSheet(null)
+    setA(null); setComments([]); setActive(null); setDraft(null); setPill(null); setPanel(false)
     loadArticle(id).then((row) => {
       setA(row)
       const mine = row.reads.find((r) => r.profile_id === me.id)
@@ -48,7 +41,6 @@ export function Reader({ id }) {
     return subscribeComments(id, reloadComments)
   }, [id, me.id, reloadComments])
 
-  // Auto mark read once the foot scrolls into view.
   useEffect(() => {
     if (!a || readState || !footRef.current || a.status !== 'ready') return
     const io = new IntersectionObserver((es) => {
@@ -72,28 +64,23 @@ export function Reader({ id }) {
     return m
   }, [comments])
   const visibleRoots = useMemo(() => roots.filter((c) => showResolved || !c.resolved_at), [roots, showResolved])
-  const resolvedCount = roots.length - roots.filter((c) => !c.resolved_at).length
+  const resolvedCount = roots.filter((c) => c.resolved_at).length
+  const liveCount = roots.length - resolvedCount
 
-  // Paint highlights and measure where each thread's passage sits.
+  // Paint highlights for every visible anchored thread, plus the draft.
   useLayoutEffect(() => {
     const body = bodyRef.current
     if (!body || !a?.content_html) return
     clearMarks(body)
     const { text } = indexText(body)
-    const found = {}
     const items = visibleRoots.filter((c) => c.quote).map((c) => ({ id: c.id, c }))
     if (draft?.quote) items.push({ id: 'draft', c: draft })
     for (const { id: cid, c } of items) {
       const pos = locate(text, c)
       if (pos < 0) continue
-      const cls = [cid === active ? 'active' : '', c.resolved_at ? 'resolved' : ''].join(' ').trim()
-      const marks = markRange(body, pos, pos + c.quote.length, { 'data-cid': cid, class: cls })
-      if (marks[0]) found[cid] = marks[0]
+      const cls = [cid === active || cid === 'draft' ? 'active' : '', c.resolved_at ? 'resolved' : ''].join(' ').trim()
+      markRange(body, pos, pos + c.quote.length, { 'data-cid': cid, class: cls })
     }
-    const readerTop = readerRef.current.getBoundingClientRect().top
-    const next = {}
-    for (const [cid, mark] of Object.entries(found)) next[cid] = mark.getBoundingClientRect().top - readerTop
-    setPositions(next)
   }, [a?.content_html, visibleRoots, draft, active])
 
   // Selection inside the body -> floating "Comment" pill.
@@ -115,18 +102,27 @@ export function Reader({ id }) {
     return () => document.removeEventListener('selectionchange', onSel)
   }, [])
 
+  const openPanel = (threadId = null) => { setActive(threadId); setPanel(true) }
+  const closePanel = useCallback(() => { setPanel(false); setDraft(null); setActive(null) }, [])
+
   const startDraft = (anchor) => {
-    setDraft(anchor); setActive('draft'); setPill(null)
+    setDraft(anchor); setActive(null); setPill(null); setPanel(true)
     document.getSelection()?.removeAllRanges()
-    if (!isDesktop) setSheet('draft')
   }
 
   const onBodyClick = (e) => {
     const mark = e.target.closest?.('mark[data-cid]')
-    if (!mark) { if (!pill) setActive(null); return }
+    if (!mark) return
     const cid = mark.getAttribute('data-cid')
-    setActive(cid)
-    if (!isDesktop) setSheet(cid)
+    if (cid !== 'draft') openPanel(cid)
+  }
+
+  const jumpTo = (cid) => {
+    const mark = bodyRef.current?.querySelector(`mark[data-cid="${cid}"]`)
+    if (!mark) return
+    mark.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    mark.classList.add('flash')
+    setTimeout(() => mark.classList.remove('flash'), 1400)
   }
 
   const submit = async (body, parentId = null) => {
@@ -135,14 +131,14 @@ export function Reader({ id }) {
     if (!parentId && draft?.quote) Object.assign(row, { quote: draft.quote, prefix: draft.prefix, suffix: draft.suffix })
     const created = await addComment(row)
     setComments((cs) => [...cs, created])
-    if (!parentId) { setDraft(null); setActive(created.id); if (sheet === 'draft') setSheet(created.id) }
+    if (!parentId) { setDraft(null); setActive(created.id) }
     upsertRead(me.id, id, {}).catch(() => {})
   }
   const handlers = {
     onReply: (parentId, body) => submit(body, parentId),
-    onResolve: async (cid, resolved) => { await resolveComment(cid, resolved); await reloadComments(); if (resolved) setActive(null) },
+    onResolve: async (cid, resolved) => { await resolveComment(cid, resolved); await reloadComments() },
     onEdit: async (cid, body) => { await editComment(cid, body); await reloadComments() },
-    onDelete: async (cid) => { await deleteComment(cid); await reloadComments(); if (active === cid) setActive(null); if (sheet === cid) setSheet(null) },
+    onDelete: async (cid) => { await deleteComment(cid); await reloadComments(); if (active === cid) setActive(null) },
   }
 
   if (error) return <div className="status">{error}</div>
@@ -150,16 +146,23 @@ export function Reader({ id }) {
 
   const readers = a.reads.filter((r) => r.read_at).map((r) => byId[r.profile_id]).filter(Boolean)
   const heroInBody = a.hero_image_url && a.content_html && a.content_html.includes(a.hero_image_url.split('?')[0].slice(-40))
-  const threadProps = (c) => ({ key: c.id, thread: c, replies: repliesOf[c.id] || [], byId, me, active: active === c.id, onActivate: () => setActive(c.id), ...handlers })
+  const commentsButton = (
+    <button className="comments-btn" onClick={() => openPanel(null)}>
+      <Bubble /> {liveCount > 0 ? `Comments ${liveCount}` : 'Comment'}
+    </button>
+  )
 
   return (
     <div className="reader" ref={readerRef} onClick={onBodyClick}>
-      <div className="reader-col">
-        <div className="reader-top">
-          <a className="back" href="#/">Back to the pile</a>
-          <a className="caps" href={a.url} target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>Open at {a.site}</a>
+      <div className="reader-top">
+        <a className="back" href="#/">Press</a>
+        <div className="tools">
+          <a className="caps" href={a.url} target="_blank" rel="noopener">Open at {a.site}</a>
+          {commentsButton}
         </div>
+      </div>
 
+      <div className="art-col">
         <header className="art-head">
           <div className="art-kicker">
             <span className="caps">{a.site}</span>
@@ -173,6 +176,7 @@ export function Reader({ id }) {
               {a.word_count ? <><span className="sep" /><span>{Math.max(1, Math.round(a.word_count / 240))} min read</span></> : null}
             </div>
           )}
+          <hr className="rule" />
           <div className="art-shares">
             {a.shares.map((s) => {
               const p = byId[s.profile_id]
@@ -194,7 +198,7 @@ export function Reader({ id }) {
             {a.hero_image_url && !heroInBody && (
               <figure className="art-hero">
                 <img src={a.hero_image_url} alt="" />
-                {a.hero_caption && <figcaption>{a.hero_caption}</figcaption>}
+                {a.hero_caption && <figcaption>{a.hero_caption.replace(/^Credit\.{3}\s*/, 'Credit: ')}</figcaption>}
               </figure>
             )}
             <div className="art-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: a.content_html }} />
@@ -212,7 +216,7 @@ export function Reader({ id }) {
 
         <div className="art-foot" ref={footRef}>
           <button className={`btn ${readState ? 'quiet' : ''}`} onClick={() => markRead(!readState)}>{readState ? 'Mark unread' : 'Mark read'}</button>
-          <button className="btn quiet" onClick={() => startDraft({ whole: true })}>Comment on the whole piece</button>
+          {commentsButton}
           {readers.length > 0 && (
             <span className="readers">
               {readers.map((p) => <span key={p.id} className="avatar sm" style={{ '--who': p.color }}>{initials(p)}</span>)}
@@ -220,40 +224,7 @@ export function Reader({ id }) {
             </span>
           )}
         </div>
-
-        {!isDesktop && (
-          <section style={{ marginTop: 28 }}>
-            <div className="rail-head" style={{ position: 'static', padding: 0, marginBottom: 12 }}>
-              <span className="caps">{visibleRoots.length} {visibleRoots.length === 1 ? 'comment' : 'comments'}</span>
-              {resolvedCount > 0 && <button className="resolved-toggle" onClick={() => setShowResolved((v) => !v)}>{showResolved ? 'Hide resolved' : `${resolvedCount} resolved`}</button>}
-            </div>
-            {visibleRoots.filter((c) => !c.quote).map((c) => <ThreadCard {...threadProps(c)} static />)}
-            {visibleRoots.filter((c) => c.quote).map((c) => <ThreadCard {...threadProps(c)} static />)}
-          </section>
-        )}
       </div>
-
-      {isDesktop && (
-        <aside className="reader-rail">
-          <div className="rail-head">
-            <span className="caps">{visibleRoots.length} {visibleRoots.length === 1 ? 'comment' : 'comments'}</span>
-            {resolvedCount > 0 && <button className="resolved-toggle" onClick={() => setShowResolved((v) => !v)}>{showResolved ? 'Hide resolved' : `${resolvedCount} resolved`}</button>}
-          </div>
-          <Rail
-            threads={visibleRoots}
-            repliesOf={repliesOf}
-            positions={positions}
-            active={active}
-            draft={draft}
-            byId={byId}
-            me={me}
-            onActivate={setActive}
-            onDraftSubmit={(body) => submit(body)}
-            onDraftCancel={() => { setDraft(null); setActive(null) }}
-            {...handlers}
-          />
-        </aside>
-      )}
 
       {pill && (
         <button className="sel-pill" style={{ left: pill.x, top: pill.y }} onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); startDraft(pill.anchor) }}>
@@ -261,20 +232,24 @@ export function Reader({ id }) {
         </button>
       )}
 
-      {!isDesktop && sheet && (
-        <>
-          <div className="sheet-scrim" onClick={() => { setSheet(null); if (sheet === 'draft') { setDraft(null); setActive(null) } }} />
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-head">
-              <span className="caps">{sheet === 'draft' ? 'New comment' : 'Thread'}</span>
-              <button className="linklike" onClick={() => { setSheet(null); if (sheet === 'draft') { setDraft(null); setActive(null) } }}>Close</button>
-            </div>
-            {sheet === 'draft'
-              ? <DraftCard draft={draft} onSubmit={(b) => submit(b)} onCancel={() => { setDraft(null); setActive(null); setSheet(null) }} static />
-              : roots.filter((c) => c.id === sheet).map((c) => <ThreadCard {...threadProps(c)} active static />)}
-          </div>
-        </>
-      )}
+      <Panel
+        open={panel}
+        onClose={closePanel}
+        roots={visibleRoots}
+        repliesOf={repliesOf}
+        byId={byId}
+        me={me}
+        active={active}
+        onActivate={setActive}
+        onJump={jumpTo}
+        draft={draft}
+        onDraftCancel={() => setDraft(null)}
+        onSubmit={(body) => submit(body)}
+        showResolved={showResolved}
+        setShowResolved={setShowResolved}
+        resolvedCount={resolvedCount}
+        {...handlers}
+      />
     </div>
   )
 }

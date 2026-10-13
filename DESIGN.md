@@ -1,74 +1,84 @@
 # Press, the design contract
 
-Press is a reading room for one group chat. Four people, mostly NYT, a margin
-to argue in. It should feel like a well-set newspaper page with a Google Docs
-comment rail bolted to the side, not like an app.
+Press is a reading room for one group chat. It should read like the paper
+itself: the New York Times section front for the feed, a New Yorker article
+page for the reader, and the Times' comment panel for the arguing. Not an app.
 
 ## References, each answering one question
 
-1. **The printed NYT page** answers *what does reading feel like*. One serif
-   doing headline and body at different optical sizes (Newsreader, variable
-   `opsz`), tight headline leading, a one-line italic dek, hairline rules, tiny
-   letter-spaced small caps for section and date. Paper, not white.
-2. **Google Docs comments** answers *how do comments behave*. A right-hand
-   rail of flat cards, each pinned to its highlight's vertical position,
-   pushed down when they collide. One pale highlight colour for every passage,
-   a stronger one for the active passage, the active card slides left by a few
-   pixels. Reply, resolve, reopen. Resolved threads leave the page.
-3. **Instapaper** answers *what is the feed*. A plain list separated by
-   hairlines. No cards, no thumbnails competing with titles, the title is the
-   whole row. Metadata is one quiet line.
+1. **The NYT section front** answers *what is the feed*. Bold Cheltenham-style
+   headlines, one grey summary line in the text face, a byline in Franklin
+   small caps, a thumbnail on the right, hairlines between stories. The
+   masthead is blackletter, centred, with the date line under it and the
+   Times' thick-then-thin double rule.
+2. **A New Yorker article page** answers *what does reading feel like*.
+   Centred kicker in letter-spaced small caps, a big Caslon headline, an
+   italic dek, the byline in small caps, a hairline, then the picture. Body in
+   Caslon at a generous size with a three-line drop cap on the first
+   paragraph. White paper, black ink, nothing tinted.
+3. **The NYT comment panel** answers *how do comments behave*. A panel slides
+   in from the right over the page, white, with a hairline on its left edge.
+   "Comments 14" and a close at the top, a composer under that, then the
+   thread list, newest first. Each comment: name bold in Franklin, time in
+   grey, body in Franklin, "Reply" in the Times blue. Replies indent under
+   their parent behind a "3 replies" toggle. Press adds the passage: a comment
+   anchored to text shows its quote on top, clicking it jumps to the highlight,
+   clicking the highlight opens the panel on that comment.
 
 Combine by assignment, never by averaging.
 
 ## Tokens
 
 ```
---paper        #F6F3EC   dark #15171A     page
---paper-2      #EFEBE1   dark #1C1F23     comment cards, sheets
---ink          #161512   dark #E8E4DA     body text, titles
---ink-2        #5B574F   dark #A39E93     deks, bylines
---ink-3        #8B867C   dark #7B766D     meta, timestamps, small caps
---rule         #D9D3C5   dark #2B2E33     every hairline
---accent       #C8102E   dark #E3453F     the masthead dot, unread marker, danger
---hl           #FBEFB1   dark #4A4420     passage highlight
---hl-active    #F4D96B   dark #7A6A22     active passage
---font-display 'Newsreader', Georgia, serif
---font-body    'Newsreader', Georgia, serif
---font-ui      'IBM Plex Sans', system-ui, sans-serif
---radius       2px
---shadow       none
+--paper        #FFFFFF   dark #121212     page
+--paper-2      #F7F7F7   dark #1A1A1A     panel composer, feed thumbs
+--ink          #121212   dark #ECECEC     body text, titles
+--ink-2        #363636   dark #BDBDBD     summaries, deks
+--ink-3        #727272   dark #8A8A8A     meta, timestamps, small caps
+--rule         #E2E2E2   dark #2E2E2E     hairlines
+--rule-strong  #121212   dark #ECECEC     the masthead double rule
+--accent       #326891   dark #6FA3C8     links, Reply, the comments button
+--hl           #FFF4B8   dark #4A4420     passage highlight
+--hl-active    #FFE86B   dark #7A6A22     active passage
+--font-masthead 'UnifrakturMaguntia', serif
+--font-display  'Libre Caslon Display', 'Libre Caslon Text', Georgia, serif
+--font-body     'Libre Caslon Text', Georgia, serif
+--font-ui       'Libre Franklin', 'Helvetica Neue', Arial, sans-serif
+--radius        0
+--shadow        none
 ```
 
 Each person owns one marker ink, stored on `profiles.color`, used for the
-initial circle, the share bar in the feed, and the border of their active
-comment card. Four defaults: `#1F4E79` (Nate), `#B5481A`, `#3E6B35`, `#7A3E8C`.
+initial circle and the active comment's left bar. Four defaults: `#1F4E79`
+(Nate), `#B5481A`, `#3E6B35`, `#7A3E8C`.
 
 ## Type scale
 
-Masthead 34/36 Newsreader 700. Feed title 22/26 Newsreader 500. Reader h1
-40/44 on desktop, 30/34 on phone, Newsreader 600, `opsz` auto. Dek 20/28 italic
-400. Body 19/31 Newsreader 400, max 680px measure. Body h2 24/30 600. Small
-caps 12/16 Plex Sans 500, 0.08em tracking, uppercase. Comment body 14/21 Plex
-Sans. Everything in the UI chrome is Plex Sans; everything that is the article
-is Newsreader.
+Masthead 44 blackletter, centred. Feed headline 20/24 Caslon Display 700.
+Feed summary 16/22 Caslon Text `--ink-2`. Reader kicker 12/16 Franklin 600,
+0.14em tracking, uppercase, centred. Reader headline 44/48 Caslon Display 700
+on desktop, 32/36 on phone, centred, max 14 words wide. Dek 21/30 Caslon
+italic `--ink-2`, centred. Byline 12/16 Franklin 600 small caps. Body 20/32
+Caslon Text, measure 640px. Drop cap 3 lines, Caslon Display. Body h2 24/30
+Caslon Display 700. Captions 12/17 Franklin `--ink-3`. Panel comment body
+15/22 Franklin. Everything in the chrome is Franklin, everything that is the
+article is Caslon.
 
 ## Rules
 
-- Rules, not boxes. A 1px `--rule` line separates things. Borders on comment
-  cards only, radius 2px, no shadow anywhere.
-- No icons where a word fits. "Reply", "Resolve", "Mark read" are words.
-- No emoji, no unicode stars.
-- Images: hotlinked, `max-width: 100%`, captions in Plex Sans `--ink-3`.
-- Desktop at or above 1040px shows the reading column plus a 300px rail.
-  Below that the rail disappears, highlights are tappable and open a bottom
-  sheet, and the comment affordance is a pill above the selection.
-- Dark mode inverts paper and ink with the values above. Highlights stay
-  yellow-brown, never blue.
-- Every visual change is rendered and looked at before it ships. Reasoning
-  about a design is not seeing it.
+- White. No cream, no tint, no gradient. Dark mode is near-black and
+  off-white with the same structure.
+- Rules, not boxes. Hairlines separate; nothing has a border radius; nothing
+  has a shadow except the panel's single left hairline.
+- The panel is 420px wide on desktop, the full width on phone, slides in over
+  the page, scrolls on its own, closes with the X, the scrim, or Escape.
+- Links and actions are `--accent` blue, underlined only in body text.
+- No icons where a word fits, except the comment bubble on the button.
+- No emoji, no unicode stars, no avatars beyond an initial in a circle.
+- Images hotlinked, full column width, captions under them.
+- Every visual change is rendered and looked at before it ships.
 
 ## Banned
 
-System font stack. Gradients. Rounded cards everywhere. One `--muted` doing
-three jobs. Avatar photos. Toast notifications. Skeleton shimmer. A hamburger.
+System font stack. Rounded cards. Shadows. Toasts. Skeleton shimmer. A
+hamburger. Colour anywhere the Times would not put it.

@@ -114,7 +114,7 @@ function Row({ a, byId }) {
   const external = a.isLink || failed
   const href = external ? a.url : `#/a/${a.id}`
   return (
-    <a className={`row ${a.isRead ? 'is-read' : ''} ${a.isLink && a.hero_image_url ? 'has-thumb' : ''}`} href={href}
+    <a className={`row ${a.isRead ? 'is-read' : ''} ${a.hero_image_url ? 'has-thumb' : ''}`} href={href}
       target={external ? '_blank' : undefined} rel={external ? 'noopener' : undefined}
       style={{ '--who': first?.color }}>
       <span className="row-bar" />
@@ -137,7 +137,7 @@ function Row({ a, byId }) {
           {failed && <><span className="sep" /><span>could not fetch, opens the source</span></>}
         </div>
       </div>
-      {a.isLink && a.hero_image_url && <img className="row-thumb" src={a.hero_image_url} alt="" loading="lazy" />}
+      {a.hero_image_url && <img className="row-thumb" src={a.hero_image_url} alt="" loading="lazy" />}
     </a>
   )
 }

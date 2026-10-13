@@ -48,7 +48,7 @@ function Shell() {
   if (!ctx.me) {
     return (
       <div className="auth-shell"><div className="auth-col">
-        <h1>Press<span className="dot">.</span></h1>
+        <h1>The Press</h1>
         <p className="auth-sub">You are signed in, but this address is not on the Press Gang list yet. Ask Nate to add it.</p>
         <button className="btn" onClick={signOut}>Sign out</button>
       </div></div>
@@ -61,14 +61,14 @@ function Shell() {
       {route.page !== 'article' && (
         <header className="masthead">
           <div className="masthead-row">
-            <h1><a href="#/" style={{ textDecoration: 'none' }}>Press<span className="dot">.</span></a></h1>
-            <nav className="masthead-meta">
-              <span className="caps">{today}</span>
+            <span className="caps masthead-left">{today}</span>
+            <h1><a href="#/">The Press</a></h1>
+            <nav className="masthead-right">
               <a className="caps" href="#/me" style={{ textDecoration: 'none' }}>{ctx.me.short_name}</a>
               <button className="caps" onClick={signOut}>Sign out</button>
             </nav>
           </div>
-          <hr className="rule" />
+          <hr className="rule double" />
         </header>
       )}
       {route.page === 'feed' && <Feed />}
