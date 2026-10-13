@@ -199,6 +199,7 @@ function AddSheet({ me, defaultScope, onClose, onDone }) {
 function useSwipe({ onRight, onLeft, disabled }) {
   const ref = useRef(null)
   const [dx, setDx] = useState(0)
+  const dxRef = useRef(0)   // the live travel; state alone lags a frame behind the finger
   const state = useRef({ x: 0, y: 0, axis: null, committed: false })
   useEffect(() => {
     const el = ref.current
@@ -218,6 +219,7 @@ function useSwipe({ onRight, onLeft, disabled }) {
       if (s.axis !== 'x') return
       e.preventDefault()
       const capped = Math.max(-160, Math.min(160, mx))
+      dxRef.current = capped
       setDx(capped)
     }
     const end = () => {
@@ -226,6 +228,7 @@ function useSwipe({ onRight, onLeft, disabled }) {
         if (dxRef.current >= SWIPE) { s.committed = true; onRight() }
         else if (dxRef.current <= -SWIPE) { s.committed = true; onLeft() }
       }
+      dxRef.current = 0
       setDx(0)
     }
     const click = (e) => { if (state.current.committed) { e.preventDefault(); e.stopPropagation(); state.current.committed = false } }
@@ -239,8 +242,6 @@ function useSwipe({ onRight, onLeft, disabled }) {
       el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.removeEventListener('click', click, true)
     }
   }, [onRight, onLeft, disabled])
-  const dxRef = useRef(0)
-  dxRef.current = dx
   return { ref, dx }
 }
 
