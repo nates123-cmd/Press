@@ -313,6 +313,15 @@ input, textarea { font: inherit; color: inherit; }
 .auth-form input { padding: 11px 12px; border: 1px solid var(--rule); background: var(--paper-2); font-size: 16px; font-family: var(--font-ui); }
 .auth-form input:focus { outline: none; border-color: var(--ink); background: var(--paper); }
 .auth-note { font-size: 12.5px; color: var(--ink-3); }
+.auth-name { font-family: var(--font-body); font-size: 22px; line-height: 26px; font-weight: 700; }
+.auth-who { display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: center; text-align: left; margin: 0 0 6px; }
+.faces { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 6px 0 4px; }
+.face { display: grid; justify-items: center; gap: 8px; padding: 10px 4px 12px; border: 1px solid transparent; font-family: var(--font-ui); font-size: 13px; font-weight: 600; }
+.face:hover { border-color: var(--rule); }
+.face:active { border-color: var(--ink); }
+.avatar.xl { width: 64px; height: 64px; font-size: 24px; }
+.face .avatar.xl { width: 72px; height: 72px; }
+@media (max-width: 420px) { .faces { grid-template-columns: repeat(2, 1fr); } }
 .err { color: #b3261e; font-size: 13px; }
 .status { padding: 48px var(--gutter); color: var(--ink-3); font-family: var(--font-body); font-style: italic; font-size: 18px; text-align: center; }
 

@@ -59,7 +59,7 @@ function Shell() {
   const [meId, setMeId] = useState(null)
   const [error, setError] = useState(null)
   const route = useHashRoute()
-  const { theme, toggle: toggleTheme } = useDayNight()
+  const { theme, toggleTheme } = useContext(ThemeContext)
 
   const refresh = useCallback(async () => {
     try {
@@ -111,10 +111,16 @@ function Shell() {
   )
 }
 
+const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} })
+
 export default function App() {
+  // The clock theme wraps the gate too, so the sign-in screen is white by day.
+  const { theme, toggle } = useDayNight()
   return (
-    <AuthGate>
-      <Shell />
-    </AuthGate>
+    <ThemeContext.Provider value={{ theme, toggleTheme: toggle }}>
+      <AuthGate>
+        <Shell />
+      </AuthGate>
+    </ThemeContext.Provider>
   )
 }
