@@ -236,6 +236,14 @@ input, textarea { font: inherit; color: inherit; }
 }
 .sel-pill::after { content: ''; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px; background: var(--ink); transform: translateX(-50%) rotate(45deg); }
 
+/* touch: the affordance sits where iOS never draws its callout */
+.sel-bar {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 12;
+  background: var(--ink); color: var(--paper);
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 13px 20px; white-space: nowrap; -webkit-user-select: none; user-select: none; touch-action: manipulation;
+}
+
 /* ---------------------------------------------------------------- comment panel (NYT) */
 .panel-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.18); z-index: 30; opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
 .panel-scrim.open { opacity: 1; pointer-events: auto; }

@@ -6,6 +6,17 @@ import { Panel } from './Panel'
 import { agoPhrase, prettyUrl } from '../components/Feed'
 import { Avatar } from '../components/Me'
 
+function useMedia(q) {
+  const [m, setM] = useState(() => window.matchMedia(q).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(q)
+    const on = () => setM(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [q])
+  return m
+}
+
 const Bubble = () => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
     <path d="M3 4.5h14v9H8l-4 3v-3H3z" strokeLinejoin="round" />
@@ -26,6 +37,9 @@ export function Reader({ id }) {
   const readerRef = useRef(null)
   const bodyRef = useRef(null)
   const footRef = useRef(null)
+  // On a touch screen iOS draws its own callout over the selection, so the
+  // affordance lives in a bar at the bottom instead of a pill at the text.
+  const touch = useMedia('(pointer: coarse)')
 
   const reloadComments = useCallback(() => loadComments(id).then(setComments).catch((e) => setError(e.message)), [id])
 
@@ -205,7 +219,7 @@ export function Reader({ id }) {
                 {a.hero_caption && <figcaption>{a.hero_caption.replace(/^Credit\.{3}\s*/, 'Credit: ')}</figcaption>}
               </figure>
             )}
-            <div className="art-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: a.content_html }} />
+            <div className="art-body" ref={bodyRef} dangerouslySetInnerHTML={{ __html: a.content_html.replace(/Credit\.{3}\s*/g, 'Credit: ') }} />
           </>
         )}
         {a.status === 'pending' && <div className="link-only">Still fetching this one. <a href={a.url} target="_blank" rel="noopener">Read it at the source</a> in the meantime.</div>}
@@ -230,9 +244,17 @@ export function Reader({ id }) {
         </div>
       </div>
 
-      {pill && (
+      {pill && !touch && (
         <button className="sel-pill" style={{ left: pill.x, top: pill.y }} onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); startDraft(pill.anchor) }}>
           Comment
+        </button>
+      )}
+      {pill && touch && (
+        <button className="sel-bar"
+          onTouchStart={(e) => e.preventDefault()}
+          onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); startDraft(pill.anchor) }}
+          onClick={(e) => { e.stopPropagation(); startDraft(pill.anchor) }}>
+          Comment on this passage
         </button>
       )}
 
