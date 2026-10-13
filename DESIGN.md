@@ -79,7 +79,10 @@ article is Caslon.
   the page, scrolls on its own, closes with the X, the scrim, or Escape.
 - Links and actions are `--accent` blue, underlined only in body text.
 - No icons where a word fits, except the comment bubble on the button.
-- No emoji, no unicode stars, no avatars beyond an initial in a circle.
+- No emoji, no unicode stars. People are their NYT-bio headshot: black and
+  white, in a circle, 24px in the margin and the panel, 20px in the feed
+  meta line. An initial in the person's ink stands in until a headshot
+  exists (`scripts/avatars.mjs`).
 - Images hotlinked, full column width, captions under them.
 - Every visual change is rendered and looked at before it ships.
 

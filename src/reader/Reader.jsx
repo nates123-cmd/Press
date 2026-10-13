@@ -4,7 +4,7 @@ import { loadArticle, loadComments, subscribeComments, upsertRead, addComment, e
 import { indexText, locate, markRange, clearMarks, anchorFromRange } from '../lib/anchor'
 import { Panel } from './Panel'
 import { agoPhrase, prettyUrl } from '../components/Feed'
-import { initials } from '../components/Me'
+import { Avatar } from '../components/Me'
 
 const Bubble = () => (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
@@ -182,7 +182,7 @@ export function Reader({ id }) {
               const p = byId[s.profile_id]
               return (
                 <div className="share-line" key={s.id} style={{ '--who': p?.color }}>
-                  <span className="avatar">{initials(p)}</span>
+                  <Avatar p={p} />
                   <div>
                     <div className="share-who">
                       {s.visibility === 'personal'
@@ -223,7 +223,7 @@ export function Reader({ id }) {
           {commentsButton}
           {readers.length > 0 && (
             <span className="readers">
-              {readers.map((p) => <span key={p.id} className="avatar sm" style={{ '--who': p.color }}>{initials(p)}</span>)}
+              {readers.map((p) => <Avatar key={p.id} p={p} size="sm" />)}
               <span style={{ marginLeft: 8 }}>read it</span>
             </span>
           )}

@@ -4,7 +4,7 @@ import { supabase } from './supabase'
 import { canonicalize, siteOf, kindOf } from './url'
 
 export async function loadProfiles() {
-  const { data, error } = await supabase.from('profiles').select('id, user_id, display_name, short_name, color, is_me').order('created_at')
+  const { data, error } = await supabase.from('profiles').select('id, user_id, display_name, short_name, color, is_me, avatar_url').order('created_at')
   if (error) throw error
   return data
 }

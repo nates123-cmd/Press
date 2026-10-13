@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePress, go } from '../App'
 import { loadFeed, subscribeFeed, shareUrl } from '../lib/press'
+import { Avatar } from './Me'
 
 const TABS = [
   { key: 'unread', label: 'Unread' },
@@ -190,7 +191,9 @@ function Row({ a, byId, me }) {
           {!a.isLink && <span>{a.site}</span>}
           {a.byline && !a.isLink && <><span className="sep" /><span>{a.byline}</span></>}
           {a.word_count ? <><span className="sep" /><span>{Math.max(1, Math.round(a.word_count / 240))} min</span></> : null}
-          <span className="sep" /><span className="who">{whoText}</span>
+          <span className="sep" />
+          {a.inGroup && a.sharers.map((id) => byId[id]?.avatar_url ? <Avatar key={id} p={byId[id]} size="sm" /> : null)}
+          <span className="who">{whoText}</span>
           {a.latest_share && <span>{ago(a.latest_share)}</span>}
           {a.commentCount > 0 && <><span className="sep" /><span className={a.newComments ? 'new' : ''}>{a.commentCount} {a.commentCount === 1 ? 'comment' : 'comments'}{a.newComments ? `, ${a.newComments} new` : ''}</span></>}
           {pending && <><span className="sep" /><span>fetching</span></>}

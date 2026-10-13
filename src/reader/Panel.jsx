@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ago } from '../components/Feed'
-import { initials } from '../components/Me'
+import { Avatar } from '../components/Me'
 
 /**
  * The comment panel, the way the Times does it: slides in from the right over
@@ -158,7 +158,7 @@ function Comment({ c, byId, me, onEdit, onDelete, extra }) {
   }
   return (
     <div className="cmt" style={{ '--who': p?.color }}>
-      <span className="avatar">{initials(p)}</span>
+      <Avatar p={p} />
       <div>
         <div className="cmt-head">
           <span className="cmt-who">{p?.display_name || p?.short_name || 'Someone'}</span>

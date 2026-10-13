@@ -40,7 +40,7 @@ export function Me() {
         <span className="caps" style={{ marginTop: 18 }}>The Press Gang</span>
         {profiles.map((p) => (
           <div className="person" key={p.id}>
-            <span className="avatar" style={{ '--who': p.color }}>{initials(p)}</span>
+            <Avatar p={p} />
             <span>{p.display_name}{p.id === me.id ? ' (you)' : ''}</span>
             <span className="muted">{p.user_id ? 'signed in' : 'not signed in yet'}</span>
           </div>
@@ -54,4 +54,13 @@ export function initials(p) {
   if (!p) return '?'
   const s = (p.short_name || p.display_name || '?').trim()
   return /^\d+$/.test(s) ? s.slice(-2) : s.slice(0, 1).toUpperCase()
+}
+
+/* The headshot when there is one, an initial in the person's ink otherwise. */
+export function Avatar({ p, size }) {
+  return (
+    <span className={`avatar ${size || ''}`} style={{ '--who': p?.color }} title={p?.display_name}>
+      {p?.avatar_url ? <img src={p.avatar_url} alt="" /> : initials(p)}
+    </span>
+  )
 }
