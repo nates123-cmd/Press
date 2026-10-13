@@ -94,6 +94,7 @@ export function Feed() {
         </div>
         <button className="add-btn" onClick={() => setAdding(true)}>+ Add a link</button>
       </div>
+      <button className="fab" aria-label="Add a link" onClick={() => setAdding(true)}>+</button>
       <hr className="rule" />
 
       {visible.length === 0 && (

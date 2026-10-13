@@ -235,6 +235,7 @@ export function Reader({ id }) {
         <div className="art-foot" ref={footRef}>
           <button className={`btn ${readState ? 'quiet' : ''}`} onClick={() => markRead(!readState)}>{readState ? 'Mark unread' : 'Mark read'}</button>
           {commentsButton}
+          <a className="btn quiet" href={a.url} target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>Open at {a.site}</a>
           {readers.length > 0 && (
             <span className="readers">
               {readers.map((p) => <Avatar key={p.id} p={p} size="sm" />)}
