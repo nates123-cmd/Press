@@ -21,7 +21,7 @@ export async function updateMe(id, patch) {
 }
 
 const FEED_COLS = `id, url, canonical_url, site, kind, status, title, byline, dek, published_at, hero_image_url, word_count, created_at,
-  shares (id, profile_id, note, shared_at),
+  shares (id, profile_id, note, shared_at, visibility),
   comments (id, author_id, parent_id, created_at, resolved_at),
   reads (profile_id, read_at, last_seen_at)`
 
@@ -36,7 +36,7 @@ export async function loadFeed() {
 export async function loadArticle(id) {
   const { data, error } = await supabase
     .from('articles')
-    .select(`*, shares (id, profile_id, note, shared_at, raw_url), reads (profile_id, read_at, last_seen_at)`)
+    .select(`*, shares (id, profile_id, note, shared_at, raw_url, visibility), reads (profile_id, read_at, last_seen_at)`)
     .eq('id', id)
     .single()
   if (error) throw error
@@ -94,8 +94,8 @@ export function subscribeFeed(onChange) {
   return () => supabase.removeChannel(ch)
 }
 
-/* The in-app fallback for a link that never went through the chat. */
-export async function shareUrl(profileId, rawUrl, note) {
+/* Add a link by hand: to the group feed, or just for yourself. */
+export async function shareUrl(profileId, rawUrl, note, visibility = 'group') {
   const canon = canonicalize(rawUrl)
   const site = siteOf(canon)
   let { data: art } = await supabase.from('articles').select('id').eq('canonical_url', canon).maybeSingle()
@@ -108,7 +108,16 @@ export async function shareUrl(profileId, rawUrl, note) {
     if (error) throw error
     art = data
   }
-  const { error } = await supabase.from('shares').insert({ article_id: art.id, profile_id: profileId, raw_url: rawUrl, note: note || null, source: 'app' })
+  const { error } = await supabase.from('shares').insert({
+    article_id: art.id, profile_id: profileId, raw_url: rawUrl, note: note || null, source: 'app', visibility,
+  })
   if (error) throw error
   return art.id
+}
+
+/* Also load the article detail's shares with visibility so the reader can say "just you". */
+export async function loadArticleShares(articleId) {
+  const { data, error } = await supabase.from('shares').select('id, profile_id, note, shared_at, raw_url, visibility').eq('article_id', articleId).order('shared_at')
+  if (error) throw error
+  return data
 }

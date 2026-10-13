@@ -17,10 +17,11 @@
     <string>3184</string>
   </array>
 
-  <!-- Every 5 minutes. One pass, one SQLite read through chatdb-dump, a
-       handful of REST calls when something new was shared. -->
+  <!-- Every minute. One pass is one SQLite read of the chat and, almost
+       always, zero REST calls, so this is nothing; it is what makes a link
+       show up in the app a minute after it lands in the chat. -->
   <key>StartInterval</key>
-  <integer>300</integer>
+  <integer>60</integer>
   <key>RunAtLoad</key>
   <true/>
 

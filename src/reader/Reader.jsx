@@ -184,7 +184,11 @@ export function Reader({ id }) {
                 <div className="share-line" key={s.id} style={{ '--who': p?.color }}>
                   <span className="avatar">{initials(p)}</span>
                   <div>
-                    <div className="share-who"><b>{p?.display_name || 'Someone'}</b> sent this {agoPhrase(s.shared_at)}</div>
+                    <div className="share-who">
+                      {s.visibility === 'personal'
+                        ? <><b>Just you</b>, added {agoPhrase(s.shared_at)}</>
+                        : <><b>{p?.display_name || 'Someone'}</b> sent this {agoPhrase(s.shared_at)}</>}
+                    </div>
                     {s.note && <p className="share-note">{s.note}</p>}
                   </div>
                 </div>
