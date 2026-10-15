@@ -92,6 +92,10 @@ export function pageExtract({ host }) {
       if (!p.textContent.trim() && !p.querySelector('img')) p.remove()
     }
     for (const f of Array.from(root.querySelectorAll('figure'))) if (!f.querySelector('img')) f.remove()
+    // Publisher boilerplate at the very end (WSJ: copyright + tracking hash,
+    // "Appeared in the ... print edition"). Trailing blocks only.
+    const TAIL_JUNK = /^(copyright\s*©|©\s*\d{4}|appeared in the .* print edition|all rights reserved)/i
+    while (root.lastElementChild && TAIL_JUNK.test(root.lastElementChild.textContent.trim())) root.lastElementChild.remove()
     // Dedupe: the same image as hero and as first figure.
     const text = Array.from(root.children).map((el) => el.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n')
     return { html: root.innerHTML, text, wordCount: text ? text.split(/\s+/).length : 0 }
@@ -146,7 +150,9 @@ export function pageExtract({ host }) {
     const PRE_DROP = ['.infobox', '.navbox', '.vertical-navbox', '.sidebar', '.mw-editsection', '.hatnote', '.reflist',
       '.mw-jump-link', '#toc', '.toc', '.metadata', '.ambox', '.shortdescription', '.mw-empty-elt', '.noprint',
       '.subscription-widget-wrap', '.subscribe-widget', '.button-wrapper', '.pencraft.pc-display-flex',
-      '[class*="paywall"]', '[class*="subscribe"]', '[id*="newsletter"]', '.share-dialog', '[data-component="newsletter"]']
+      '[class*="paywall"]', '[class*="subscribe"]', '[id*="newsletter"]', '.share-dialog', '[data-component="newsletter"]',
+      // WSJ: the author bio card after the story, and series/"more from" insets.
+      '[data-testid^="author-module"]', '[data-sub_type="series-navigation"]']
     for (const sel of PRE_DROP) {
       for (const el of Array.from(doc.querySelectorAll(sel))) {
         // A "paywall" box is usually the prompt, but WSJ puts a signed-in
