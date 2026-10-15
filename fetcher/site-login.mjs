@@ -42,5 +42,14 @@ try {
 const page = ctx.pages()[0] || (await ctx.newPage())
 await page.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {})
 console.log(`Chrome is open on ${url}. Sign in, then close the Chrome window.`)
-await new Promise((resolve) => ctx.on('close', resolve))
+// On macOS closing the last window leaves Chrome running, so the context never
+// closes by itself and the profile stays locked. Finish when the last tab goes.
+await new Promise((resolve) => {
+  ctx.on('close', resolve)
+  const check = () => { if (ctx.pages().length === 0) resolve() }
+  const watch = (p) => p.on('close', () => setTimeout(check, 500))
+  ctx.pages().forEach(watch)
+  ctx.on('page', watch)
+})
+await ctx.close().catch(() => {})   // graceful: flushes the login cookies to disk
 console.log('Saved. The reader now reads this site signed in.')
