@@ -147,7 +147,15 @@ export function pageExtract({ host }) {
       '.mw-jump-link', '#toc', '.toc', '.metadata', '.ambox', '.shortdescription', '.mw-empty-elt', '.noprint',
       '.subscription-widget-wrap', '.subscribe-widget', '.button-wrapper', '.pencraft.pc-display-flex',
       '[class*="paywall"]', '[class*="subscribe"]', '[id*="newsletter"]', '.share-dialog', '[data-component="newsletter"]']
-    for (const sel of PRE_DROP) for (const el of Array.from(doc.querySelectorAll(sel))) el.remove()
+    for (const sel of PRE_DROP) {
+      for (const el of Array.from(doc.querySelectorAll(sel))) {
+        // A "paywall" box is usually the prompt, but WSJ puts a signed-in
+        // reader's whole body in div.paywall (2026-10-15). Keep any that hold
+        // real paragraphs; only short prompts go.
+        if (sel === '[class*="paywall"]' && el.querySelectorAll('p').length >= 3) continue
+        el.remove()
+      }
+    }
     const art = new window.Readability(doc, { keepClasses: false }).parse()
     if (!art || !art.content) return { error: 'readability: nothing parsed' }
     const holder = document.createElement('div')
