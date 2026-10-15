@@ -1,0 +1,23 @@
+# Link previews for Press share links. Lives on the Beelink at ~/apps/press-share.
+# Caddy (~/apps/proxy) proxies press.nsteph.com to press-share:8080 over
+# media_default, the network Caddy already sits on, so Caddy itself never has
+# to be recreated to reach it. No host ports.
+#
+# press-share.env: SUPABASE_URL, SUPABASE_ANON_KEY (the public anon key).
+services:
+  press-share:
+    image: python:3.12-alpine
+    container_name: press-share
+    restart: unless-stopped
+    command: ["python", "-u", "/app/server.py"]
+    env_file: press-share.env
+    volumes:
+      - ./server.py:/app/server.py:ro
+    networks:
+      - media_default
+    read_only: true
+    mem_limit: 64m
+
+networks:
+  media_default:
+    external: true
