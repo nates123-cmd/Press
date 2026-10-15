@@ -97,6 +97,12 @@ async function newContext(host) {
   return ctx
 }
 
+// Sites behind DataDome. Only the real Chrome on the Mac gets past it, so the
+// Beelink never touches them and nytLocalPass reads them all. WSJ added
+// 2026-10-15: its wall even refuses preview bots. Without a WSJ login the page
+// is the paywall teaser, which still lands as a link card with title and photo.
+const WALLED = ['nytimes.com', 'wsj.com']
+
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, '').replace(/^m\./, '') } catch { return '' } }
 
 // ------------------------------------------------------------------ extraction
@@ -132,7 +138,7 @@ async function renderArticle(url) {
 async function nytLocalPass() {
   const profile = path.join(here, 'state/chrome-profile')
   if (!fs.existsSync(profile)) { log('nyt-local: no chrome profile; run nyt-login.mjs first'); return 0 }
-  const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&site=eq.nytimes.com&attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=8`, undefined, 'return=representation')
+  const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&site=in.(${WALLED.join(',')})&attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=8`, undefined, 'return=representation')
   if (!rows?.length) { log('nyt-local: nothing pending'); return 0 }
   // Headed by default, window parked offscreen: the wall detects headless Chrome (tested 2026-10-09).
   const headless = ENV.NYT_HEADLESS === 'true'
@@ -151,7 +157,7 @@ async function nytLocalPass() {
       page.setDefaultTimeout(30000)
       try {
         await page.goto(a.url, { waitUntil: 'domcontentloaded' })
-        await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"]', { timeout: 20000 }).catch(() => {})
+        await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"], article', { timeout: 20000 }).catch(() => {})
         await page.waitForTimeout(1500)
         const title = await page.title()
         const walled = /you have been blocked|suspect that you're a robot|access denied/i.test(title) || await page.$('iframe[src*="captcha-delivery"]')
@@ -162,7 +168,7 @@ async function nytLocalPass() {
           break
         }
         await page.addScriptTag({ path: READABILITY })
-        const r = await page.evaluate(pageExtract, { host: 'nytimes.com' })
+        const r = await page.evaluate(pageExtract, { host: a.site })
         if (r.error) throw new Error(r.error)
         const isArticle = r.wordCount >= 120
         await sb('PATCH', `articles?id=eq.${a.id}`, {
@@ -176,11 +182,11 @@ async function nytLocalPass() {
           attempts: (a.attempts || 0) + 1, fetch_error: null, fetched_at: new Date().toISOString(),
         })
         done++
-        log('ready nytimes.com', `${r.wordCount}w`, r.method, (r.title || '').slice(0, 60))
+        log(isArticle ? 'ready' : 'link_only', a.site, `${r.wordCount}w`, r.method, (r.title || '').slice(0, 60))
       } catch (e) {
         const attempts = (a.attempts || 0) + 1
         await sb('PATCH', `articles?id=eq.${a.id}`, { attempts, fetch_error: String(e.message).slice(0, 500), status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending' })
-        log('retry nytimes.com', a.url.slice(0, 80), '->', e.message.slice(0, 120))
+        log('retry', a.site, a.url.slice(0, 80), '->', e.message.slice(0, 120))
       } finally {
         await page.close().catch(() => {})
       }
@@ -263,8 +269,8 @@ async function processOne(a) {
 }
 
 async function pass() {
-  // nytimes.com is never fetched here: see nytLocalPass, it runs on the Mac.
-  const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&attempts=lt.${MAX_ATTEMPTS}&site=neq.nytimes.com&order=created_at.asc&limit=6`, undefined, 'return=representation')
+  // Walled sites are never fetched here: see nytLocalPass, it runs on the Mac.
+  const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&attempts=lt.${MAX_ATTEMPTS}&site=not.in.(${WALLED.join(',')})&order=created_at.asc&limit=6`, undefined, 'return=representation')
   for (const a of rows || []) await processOne(a)
   return (rows || []).length
 }
