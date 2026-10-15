@@ -136,11 +136,14 @@ export async function loadArticleShares(articleId) {
 }
 
 /* Outside the group: a read-only link to one article, no sign-in. The token
- * is minted once per article and reused, so sharing twice gives one link. */
+ * is minted once per article and reused, so sharing twice gives one link.
+ * The link goes through press.nsteph.com (share/server.py on the Beelink) so
+ * message previews show the article; it 302s people to #/s/<token> here. */
+const SHARE_HOST = 'https://press.nsteph.com'
 export async function publicShareLink(articleId) {
   const { data, error } = await supabase.rpc('press_share_article', { p_article_id: articleId })
   if (error) throw error
-  return `${window.location.origin}${import.meta.env.BASE_URL}#/s/${data}`
+  return `${SHARE_HOST}/s/${data}`
 }
 
 export async function loadPublicArticle(token) {
