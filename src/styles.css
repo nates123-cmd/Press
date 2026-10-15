@@ -437,7 +437,6 @@ input, textarea { font: inherit; color: inherit; }
   .row.has-thumb { grid-template-columns: 1fr 96px; }
   .row-thumb { width: 96px; height: 72px; }
   .panel { width: 100vw; }
-  .reader.shared .reader-top .tools a.shared-source { display: inline; }
 }
 
 /* Share, and the public page (#/s/<token>): the reader with the group taken out. */

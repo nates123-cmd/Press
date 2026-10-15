@@ -1,8 +1,17 @@
-/* The page a friend outside the group lands on: #/s/<token>. No sign-in, no
- * comments, no names. The article as the reader shows it, and a way to the
- * source. Everything it shows comes from press_public_article(). */
+/* The page a share link lands on: #/s/<token>. Anyone reads, no sign-in, no
+ * names, no comment text. "Comment" moves to #/a/<id>, which the gate guards:
+ * pick your face, enter the code, and the full reader opens on this article.
+ * A member already signed in skips this page and goes straight there.
+ * Everything it shows comes from press_public_article(). */
 import { useEffect, useState } from 'react'
 import { loadPublicArticle } from '../lib/press'
+import { supabase } from '../lib/supabase'
+
+const Bubble = () => (
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+    <path d="M3 4.5h14v9H8l-4 3v-3H3z" strokeLinejoin="round" />
+  </svg>
+)
 
 export function Shared({ token }) {
   const [a, setA] = useState(undefined)
@@ -10,8 +19,13 @@ export function Shared({ token }) {
 
   useEffect(() => {
     setA(undefined)
-    loadPublicArticle(token).then(setA).catch((e) => setError(e.message))
+    Promise.all([loadPublicArticle(token), supabase.auth.getSession()]).then(([row, { data }]) => {
+      if (row && data.session) { window.location.replace(`#/a/${row.id}`); return }
+      setA(row)
+    }).catch((e) => setError(e.message))
   }, [token])
+
+  const comment = () => { window.location.hash = `#/a/${a.id}` }
 
   useEffect(() => { if (a?.title) document.title = a.title }, [a])
 
@@ -21,6 +35,11 @@ export function Shared({ token }) {
 
   const heroInBody = a.hero_image_url && a.content_html && a.content_html.includes(a.hero_image_url.split('?')[0].slice(-40))
   const ready = a.status === 'ready' && a.content_html
+  const commentButton = (
+    <button className="comments-btn" onClick={comment} title="Sign in as yourself to read and add comments">
+      <Bubble /> {a.comment_count > 0 ? `Comments ${a.comment_count}` : 'Comment'}
+    </button>
+  )
 
   return (
     <div className="reader shared">
@@ -28,6 +47,7 @@ export function Shared({ token }) {
         <span className="shared-mark">Press Gang</span>
         <div className="tools">
           <a className="caps shared-source" href={a.url} target="_blank" rel="noopener">Open at {a.site}</a>
+          {commentButton}
         </div>
       </div>
 
@@ -66,6 +86,7 @@ export function Shared({ token }) {
         )}
 
         <div className="art-foot">
+          {commentButton}
           <a className="btn quiet" href={a.url} target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>Open at {a.site}</a>
           <span className="readers">Shared from Press Gang</span>
         </div>
