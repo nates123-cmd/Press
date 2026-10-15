@@ -96,6 +96,13 @@ export function pageExtract({ host }) {
     // "Appeared in the ... print edition"). Trailing blocks only.
     const TAIL_JUNK = /^(copyright\s*©|©\s*\d{4}|appeared in the .* print edition|all rights reserved)/i
     while (root.lastElementChild && TAIL_JUNK.test(root.lastElementChild.textContent.trim())) root.lastElementChild.remove()
+    // A bare dateline before the story ("Updated Oct. 15, 2026 7:53 am ET",
+    // WSJ) would take the reader's drop cap. Only standalone date lines in
+    // the first few blocks; the date is in the kicker already.
+    const DATELINE = /^(updated|published)?\s*[a-z]{3,9}\.?\s+\d{1,2},\s+\d{4}(\s+\d{1,2}:\d{2}\s*[ap]\.?m\.?)?(\s+[a-z]{2,4})?$/i
+    for (const el of Array.from(root.children).slice(0, 4)) {
+      if (el.tagName !== 'FIGURE' && DATELINE.test(el.textContent.replace(/\s+/g, ' ').trim())) el.remove()
+    }
     // Dedupe: the same image as hero and as first figure.
     const text = Array.from(root.children).map((el) => el.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n')
     return { html: root.innerHTML, text, wordCount: text ? text.split(/\s+/).length : 0 }
