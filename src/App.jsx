@@ -4,6 +4,7 @@ import { loadProfiles, myProfileId } from './lib/press'
 import { Feed } from './components/Feed'
 import { Me } from './components/Me'
 import { Reader } from './reader/Reader'
+import { Shared } from './reader/Shared'
 
 export const PressContext = createContext(null)
 export const usePress = () => useContext(PressContext)
@@ -113,9 +114,19 @@ function Shell() {
 
 const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} })
 
+const sharedToken = (hash) => hash.match(/^#\/s\/([A-Za-z0-9_-]{16,64})/)?.[1] || null
+
 export default function App() {
   // The clock theme wraps the gate too, so the sign-in screen is white by day.
   const { theme, toggle } = useDayNight()
+  // A public share link opens without the gate: friends outside the group.
+  const [token, setToken] = useState(() => sharedToken(window.location.hash))
+  useEffect(() => {
+    const on = () => setToken(sharedToken(window.location.hash))
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
+  if (token) return <Shared token={token} />
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme: toggle }}>
       <AuthGate>

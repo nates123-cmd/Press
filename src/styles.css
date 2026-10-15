@@ -437,4 +437,10 @@ input, textarea { font: inherit; color: inherit; }
   .row.has-thumb { grid-template-columns: 1fr 96px; }
   .row-thumb { width: 96px; height: 72px; }
   .panel { width: 100vw; }
+  .reader.shared .reader-top .tools a.shared-source { display: inline; }
 }
+
+/* Share, and the public page (#/s/<token>): the reader with the group taken out. */
+.share-btn { color: var(--ink-3); border-color: var(--rule); }
+.share-btn:hover { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.shared-mark { font-family: var(--font-masthead); font-size: 22px; color: var(--ink); }

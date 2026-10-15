@@ -134,3 +134,17 @@ export async function loadArticleShares(articleId) {
   if (error) throw error
   return data
 }
+
+/* Outside the group: a read-only link to one article, no sign-in. The token
+ * is minted once per article and reused, so sharing twice gives one link. */
+export async function publicShareLink(articleId) {
+  const { data, error } = await supabase.rpc('press_share_article', { p_article_id: articleId })
+  if (error) throw error
+  return `${window.location.origin}${import.meta.env.BASE_URL}#/s/${data}`
+}
+
+export async function loadPublicArticle(token) {
+  const { data, error } = await supabase.rpc('press_public_article', { p_token: token })
+  if (error) throw error
+  return data?.[0] || null
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePress } from '../App'
-import { loadArticle, loadComments, subscribeComments, upsertRead, addComment, editComment, deleteComment, resolveComment } from '../lib/press'
+import { loadArticle, loadComments, subscribeComments, upsertRead, addComment, editComment, deleteComment, resolveComment, publicShareLink } from '../lib/press'
 import { indexText, locate, markRange, clearMarks, anchorFromRange } from '../lib/anchor'
 import { Panel } from './Panel'
 import { agoPhrase, prettyUrl } from '../components/Feed'
@@ -22,6 +22,36 @@ const Bubble = () => (
     <path d="M3 4.5h14v9H8l-4 3v-3H3z" strokeLinejoin="round" />
   </svg>
 )
+
+/* A read-only link for someone outside the group. Phones get the share
+ * sheet; desktops get the link copied. iOS refuses a share sheet opened after
+ * a slow network wait, so a refusal leaves the link ready and the next tap
+ * opens the sheet at once. */
+function ShareButton({ articleId, title }) {
+  const [link, setLink] = useState(null)
+  const [label, setLabel] = useState('Share')
+  useEffect(() => { setLink(null); setLabel('Share') }, [articleId])
+  const send = async (url) => {
+    if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+      try { await navigator.share({ title: title || 'An article', url }); setLabel('Share'); return }
+      catch (e) {
+        if (e.name === 'AbortError') { setLabel('Share'); return }
+        setLabel('Send link'); return
+      }
+    }
+    try { await navigator.clipboard.writeText(url); setLabel('Link copied') }
+    catch { window.prompt('Copy this link', url); setLabel('Share') }
+    setTimeout(() => setLabel('Share'), 2500)
+  }
+  const onClick = async (e) => {
+    e.stopPropagation()
+    if (link) return send(link)
+    setLabel('Making link')
+    try { const url = await publicShareLink(articleId); setLink(url); await send(url) }
+    catch (err) { setLabel('Could not share'); console.error(err); setTimeout(() => setLabel('Share'), 2500) }
+  }
+  return <button className="comments-btn share-btn" onClick={onClick} title="A read-only link anyone can open, no sign-in">{label}</button>
+}
 
 export function Reader({ id }) {
   const { me, byId } = usePress()
@@ -172,6 +202,7 @@ export function Reader({ id }) {
         <a className="back" href="#/">Press Gang</a>
         <div className="tools">
           <a className="caps" href={a.url} target="_blank" rel="noopener">Open at {a.site}</a>
+          <ShareButton articleId={id} title={a.title} />
           {commentsButton}
         </div>
       </div>
@@ -235,6 +266,7 @@ export function Reader({ id }) {
         <div className="art-foot" ref={footRef}>
           <button className={`btn ${readState ? 'quiet' : ''}`} onClick={() => markRead(!readState)}>{readState ? 'Mark unread' : 'Mark read'}</button>
           {commentsButton}
+          <ShareButton articleId={id} title={a.title} />
           <a className="btn quiet" href={a.url} target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>Open at {a.site}</a>
           {readers.length > 0 && (
             <span className="readers">
