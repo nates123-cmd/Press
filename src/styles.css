@@ -109,6 +109,9 @@ input, textarea { font: inherit; color: inherit; }
 .row-meta .who { color: var(--who, var(--ink-2)); font-weight: 600; }
 .row-meta .sep::before { content: '|'; color: var(--rule); }
 .row-meta .new { color: var(--accent); font-weight: 600; }
+/* Fetch progress: quiet italics while it works, the ink darkens when something is wrong. */
+.row-meta .fetch { font-style: italic; }
+.row-meta .fetch.bad { color: var(--ink-2); }
 .row-note {
   margin: 8px 0 0; font-family: var(--font-body); font-size: 16px; line-height: 22px; font-style: italic; color: var(--ink-2);
   border-left: 2px solid var(--who, var(--rule)); padding-left: 10px;
@@ -142,6 +145,7 @@ input, textarea { font: inherit; color: inherit; }
   font-size: 17px; line-height: 22px; font-weight: 700; color: var(--ink);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+.act-fetch { padding: 10px 20px; border-bottom: 1px solid var(--rule); font-size: 12px; line-height: 16px; font-style: italic; color: var(--ink-2); }
 .act { text-align: left; padding: 13px 20px; border-bottom: 1px solid var(--rule); font-size: 15px; font-weight: 600; color: var(--ink); display: grid; gap: 2px; }
 .act span { font-size: 12px; line-height: 16px; font-weight: 400; color: var(--ink-3); }
 .act:hover { background: var(--paper-2); }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePress, go } from '../App'
-import { loadFeed, subscribeFeed, shareUrl, upsertRead, deleteMyShares, setMyShareVisibility } from '../lib/press'
+import { loadFeed, loadWorkers, retryFetch, subscribeFeed, shareUrl, upsertRead, deleteMyShares, setMyShareVisibility } from '../lib/press'
+import { fetchState } from '../lib/fetchState'
 import { Avatar } from './Me'
 
 const SWIPE = 88 // px of travel that commits a swipe
@@ -37,9 +38,28 @@ export function Feed() {
   const [undo, setUndo] = useState({})   // article id -> true while its "Dismissed, undo" line shows
   const [acting, setActing] = useState(null) // the row whose long-press sheet is open
 
-  const refresh = useCallback(() => loadFeed().then(setRows).catch((e) => setError(e.message)), [])
+  /* The readers' heartbeats and a clock that ticks while anything is still
+   * fetching, so "in queue 40s" keeps counting without a reload. The workers
+   * table is optional: if it cannot be read the row just says "in queue". */
+  const [workers, setWorkers] = useState(null)
+  const [now, setNow] = useState(() => Date.now())
+  const refresh = useCallback(() => Promise.all([
+    loadFeed().then(setRows).catch((e) => setError(e.message)),
+    loadWorkers().then(setWorkers).catch(() => setWorkers(null)),
+  ]), [])
   useEffect(() => { refresh() }, [refresh])
   useEffect(() => subscribeFeed(() => refresh()), [refresh])
+  const anyPending = !!rows?.some((a) => a.status === 'pending')
+  useEffect(() => {
+    if (!anyPending) return
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 10000)
+    return () => clearInterval(t)
+  }, [anyPending])
+  const retry = useCallback((a) => {
+    setRows((rs) => rs && rs.map((r) => r.id !== a.id ? r : { ...r, status: 'pending', attempts: 0, fetch_error: null, claimed_at: null, queued_at: new Date().toISOString() }))
+    retryFetch(a.id).catch(() => refresh())
+  }, [refresh])
   useEffect(() => { try { localStorage.setItem('press-tab', tab) } catch {} }, [tab])
 
   /* Swipes: change the row locally first, then write. A failed write
@@ -166,11 +186,12 @@ export function Feed() {
             <button className="linklike" onClick={() => undismiss(a)}>Undo</button>
           </div>
         )
-        : <Row key={a.id} a={a} byId={byId} me={me} onRead={() => toggleRead(a)} onDismiss={() => dismiss(a)} onHold={() => setActing(a.id)} />)}
+        : <Row key={a.id} a={a} byId={byId} me={me} fetch={fetchState(a, workers, now)} onRead={() => toggleRead(a)} onDismiss={() => dismiss(a)} onHold={() => setActing(a.id)} />)}
 
       {acting && decorated.find((a) => a.id === acting) && (
         <ActionSheet a={decorated.find((a) => a.id === acting)} me={me} byId={byId} onClose={() => setActing(null)}
-          onRead={toggleRead} onDismiss={dismiss} onMine={moveToMine} onGroup={moveToGroup} onDelete={removeMine} />
+          fetch={fetchState(decorated.find((a) => a.id === acting), workers, now)}
+          onRead={toggleRead} onDismiss={dismiss} onMine={moveToMine} onGroup={moveToGroup} onDelete={removeMine} onRetry={retry} />
       )}
 
       {adding && <AddSheet me={me} defaultScope={tab === 'mine' ? 'personal' : 'group'} onClose={() => setAdding(false)} onDone={async (id) => { setAdding(false); await refresh(); go(`#/a/${id}`) }} />}
@@ -224,7 +245,7 @@ function AddSheet({ me, defaultScope, onClose, onDone }) {
           <button type="button" className="btn quiet" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn solid" disabled={busy || !url}>{busy ? 'Adding' : 'Add'}</button>
         </div>
-        <div className="hint">It shows up as "fetching" first and gets its headline within a minute or two.</div>
+        <div className="hint">It lands as "in queue" and gets its headline in about 2 min. NYT and WSJ read from Nate's Mac, so they wait while it sleeps.</div>
       </form>
     </>
   )
@@ -310,7 +331,7 @@ function useSwipe({ onRight, onLeft, onHold, disabled }) {
   return { ref, dx }
 }
 
-function Row({ a, byId, me, onRead, onDismiss, onHold }) {
+function Row({ a, byId, me, fetch, onRead, onDismiss, onHold }) {
   const { ref: swipeRef, dx } = useSwipe({ onRight: onRead, onLeft: onDismiss, onHold, disabled: !onRead })
   const first = byId[a.sharers[0]]
   const who = a.inGroup || a.isMoved
@@ -318,7 +339,6 @@ function Row({ a, byId, me, onRead, onDismiss, onHold }) {
     : ['Just you']
   const whoText = who.length <= 2 ? who.join(' and ') : `${who.slice(0, -1).join(', ')} and ${who[who.length - 1]}`
   const title = a.title || prettyUrl(a.url)
-  const pending = a.status === 'pending'
   const failed = a.status === 'failed'
   const external = a.isLink || failed
   const href = external ? a.url : `#/a/${a.id}`
@@ -348,8 +368,7 @@ function Row({ a, byId, me, onRead, onDismiss, onHold }) {
           <span className="who">{whoText}</span>
           {a.latest_share && <span>{ago(a.latest_share)}</span>}
           {a.commentCount > 0 && <><span className="sep" /><span className={a.newComments ? 'new' : ''}>{a.commentCount} {a.commentCount === 1 ? 'comment' : 'comments'}{a.newComments ? `, ${a.newComments} new` : ''}</span></>}
-          {pending && <><span className="sep" /><span>fetching</span></>}
-          {failed && <><span className="sep" /><span>could not fetch, opens the source</span></>}
+          {fetch && <><span className="sep" /><span className={`fetch ${fetch.tone}`}>{fetch.text}</span></>}
         </div>
       </div>
       {a.hero_image_url && <img className="row-thumb" src={a.hero_image_url} alt="" loading="lazy" />}
@@ -362,7 +381,7 @@ function Row({ a, byId, me, onRead, onDismiss, onHold }) {
  * Just me works on anything too: my own shares go personal for everyone,
  * a link someone else sent moves only for me. Delete is only ever for my
  * own shares; if somebody else also sent it, their share stays. */
-function ActionSheet({ a, me, byId, onClose, onRead, onDismiss, onMine, onGroup, onDelete }) {
+function ActionSheet({ a, me, byId, fetch, onClose, onRead, onDismiss, onMine, onGroup, onDelete, onRetry }) {
   const [confirm, setConfirm] = useState(false)
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -388,6 +407,8 @@ function ActionSheet({ a, me, byId, onClose, onRead, onDismiss, onMine, onGroup,
       <div className="panel-scrim open" onClick={scrim} />
       <div className="act-sheet" role="dialog" aria-label="Actions" onClick={(e) => e.stopPropagation()}>
         <div className="act-title">{a.title || prettyUrl(a.url)}</div>
+        {fetch && <div className="act-fetch">{fetch.text}</div>}
+        {fetch?.retry && <button className="act" onClick={act(onRetry)}>Try again<span>Back to the front of the queue with a clean slate.</span></button>}
         {!a.isLink && <button className="act" onClick={act(onRead)}>{a.isRead ? 'Mark as unread' : 'Mark as read'}</button>}
         <button className="act" onClick={act(onDismiss)}>Dismiss<span>Hidden for you only.</span></button>
         {a.inGroup && <button className="act" onClick={act(onMine)}>Move to Just me<span>{mineHint}</span></button>}

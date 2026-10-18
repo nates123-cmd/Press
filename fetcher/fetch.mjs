@@ -8,7 +8,8 @@
  * (YouTube, Spotify, X, ...) get a title and a thumbnail and status = link_only.
  *
  * Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, optional NYT_STATE (path),
- *      POLL_SECONDS (default 60), MAX_ATTEMPTS (default 5).
+ *      POLL_SECONDS (default 60), MAX_ATTEMPTS (default 5),
+ *      WORKER_NAME (default beelink; the heartbeat row in press_workers).
  *
  * Modes:
  *   node fetch.mjs              loop forever (the container's command)
@@ -75,6 +76,18 @@ async function sb(method, p, body, prefer) {
   return txt ? JSON.parse(txt) : null
 }
 
+/* One row per reader in press_workers. The app reads it to tell "still
+ * fetching" from "nothing is fetching": a stale heartbeat means the Beelink
+ * is down or the Mac is asleep, and the feed can say so instead of spinning. */
+const WORKER = ENV.WORKER_NAME || 'beelink'
+async function heartbeat(name, patch = {}) {
+  try {
+    await sb('POST', 'press_workers?on_conflict=name', { name, last_seen_at: new Date().toISOString(), ...patch }, 'resolution=merge-duplicates,return=minimal')
+  } catch (e) { log('heartbeat failed', e.message) }
+}
+// Mark the row as being read right now; the feed shows "reading now" for it.
+const claim = (id) => sb('PATCH', `articles?id=eq.${id}`, { claimed_at: new Date().toISOString() }).catch(() => {})
+
 // ------------------------------------------------------------------ browser
 let browser
 async function getBrowser() {
@@ -137,7 +150,8 @@ async function renderArticle(url) {
  */
 async function nytLocalPass() {
   const profile = path.join(here, 'state/chrome-profile')
-  if (!fs.existsSync(profile)) { log('nyt-local: no chrome profile; run nyt-login.mjs first'); return 0 }
+  if (!fs.existsSync(profile)) { log('nyt-local: no chrome profile; run nyt-login.mjs first'); await heartbeat('mac', { note: 'no chrome profile' }); return 0 }
+  await heartbeat('mac', { note: null })
   const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&site=in.(${WALLED.join(',')})&attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=8`, undefined, 'return=representation')
   if (!rows?.length) { log('nyt-local: nothing pending'); return 0 }
   // Headed by default, window parked offscreen: the wall detects headless Chrome (tested 2026-10-09).
@@ -156,6 +170,7 @@ async function nytLocalPass() {
       const page = await ctx.newPage()
       page.setDefaultTimeout(30000)
       try {
+        await claim(a.id)
         await page.goto(a.url, { waitUntil: 'domcontentloaded' })
         await page.waitForSelector('section[name="articleBody"], #gateway-content, [data-testid="gateway-container"], article', { timeout: 20000 }).catch(() => {})
         await page.waitForTimeout(1500)
@@ -165,6 +180,7 @@ async function nytLocalPass() {
           log('nyt-local: bot wall on', a.url.slice(0, 80), `(title: ${title.slice(0, 60)}) - stopping this pass, attempts untouched`)
           // The wall's cookie is now poisoned; drop it so the next pass starts clean.
           await ctx.clearCookies({ name: 'datadome' }).catch(() => {})
+          await heartbeat('mac', { note: 'bot wall' })
           break
         }
         await page.addScriptTag({ path: READABILITY })
@@ -182,6 +198,7 @@ async function nytLocalPass() {
           attempts: (a.attempts || 0) + 1, fetch_error: null, fetched_at: new Date().toISOString(),
         })
         done++
+        await heartbeat('mac', { last_ok_at: new Date().toISOString(), note: null })
         log(isArticle ? 'ready' : 'link_only', a.site, `${r.wordCount}w`, r.method, (r.title || '').slice(0, 60))
       } catch (e) {
         const attempts = (a.attempts || 0) + 1
@@ -242,6 +259,7 @@ async function processOne(a) {
   const attempts = (a.attempts || 0) + 1
   const started = Date.now()
   try {
+    await claim(a.id)
     const r = a.kind === 'link' ? await renderCard(a.url) : await renderArticle(a.url)
     if (r.error) throw new Error(r.error)
     const isArticle = a.kind === 'article' && r.wordCount >= 120
@@ -260,6 +278,7 @@ async function processOne(a) {
       attempts, fetch_error: null, fetched_at: new Date().toISOString(),
     }
     await sb('PATCH', `articles?id=eq.${a.id}`, patch)
+    await heartbeat(WORKER, { last_ok_at: new Date().toISOString() })
     log(patch.status, a.site, `${r.wordCount}w`, r.method, `${Date.now() - started}ms`, (patch.title || '').slice(0, 60))
   } catch (e) {
     const failed = attempts >= MAX_ATTEMPTS
@@ -269,6 +288,7 @@ async function processOne(a) {
 }
 
 async function pass() {
+  await heartbeat(WORKER)
   // Walled sites are never fetched here: see nytLocalPass, it runs on the Mac.
   const rows = await sb('GET', `articles?select=id,url,site,kind,attempts&status=eq.pending&attempts=lt.${MAX_ATTEMPTS}&site=not.in.(${WALLED.join(',')})&order=created_at.asc&limit=6`, undefined, 'return=representation')
   for (const a of rows || []) await processOne(a)

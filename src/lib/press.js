@@ -20,7 +20,7 @@ export async function updateMe(id, patch) {
   if (error) throw error
 }
 
-const FEED_COLS = `id, url, canonical_url, site, kind, status, title, byline, dek, published_at, hero_image_url, word_count, created_at,
+const FEED_COLS = `id, url, canonical_url, site, kind, status, title, byline, dek, published_at, hero_image_url, word_count, created_at, attempts, fetch_error, claimed_at, queued_at,
   shares (id, profile_id, note, shared_at, visibility),
   comments (id, author_id, parent_id, created_at, resolved_at),
   reads (profile_id, read_at, last_seen_at, dismissed_at, moved_at)`
@@ -31,6 +31,19 @@ export async function loadFeed() {
   for (const a of data) a.latest_share = a.shares.length ? a.shares.reduce((m, s) => (s.shared_at > m ? s.shared_at : m), '') : a.created_at
   data.sort((a, b) => (a.latest_share < b.latest_share ? 1 : -1))
   return data
+}
+
+/* The readers' heartbeats: { beelink: {...}, mac: {...} }. */
+export async function loadWorkers() {
+  const { data, error } = await supabase.from('press_workers').select('name, last_seen_at, last_ok_at, note')
+  if (error) throw error
+  return Object.fromEntries(data.map((w) => [w.name, w]))
+}
+
+/* Ask for another go at a link that failed or is stuck. */
+export async function retryFetch(articleId) {
+  const { error } = await supabase.rpc('press_retry', { p_article_id: articleId })
+  if (error) throw error
 }
 
 export async function loadArticle(id) {
@@ -90,6 +103,7 @@ export function subscribeFeed(onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'articles' }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'shares' }, onChange)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'press_workers' }, onChange)
     .subscribe()
   return () => supabase.removeChannel(ch)
 }
