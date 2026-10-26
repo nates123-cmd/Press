@@ -95,7 +95,7 @@ function Shell() {
         <header className="masthead">
           <div className="masthead-row">
             <span className="caps masthead-left">{today}</span>
-            <h1><a href="#/">Press Gang</a></h1>
+            <h1><a href="#/">{ctx.me.solo ? 'Press' : 'Press Gang'}</a></h1>
             <nav className="masthead-right">
               <button className="caps" onClick={toggleTheme} title="Day from 7 AM, night from 7 PM. Click to override until tomorrow.">{theme === 'light' ? 'Night' : 'Day'}</button>
               <a className="caps" href="#/me" style={{ textDecoration: 'none' }}>{ctx.me.short_name}</a>

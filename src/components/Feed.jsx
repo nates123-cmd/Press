@@ -13,6 +13,8 @@ const TABS = [
   { key: 'mine', label: 'Just me' },
   { key: 'links', label: 'Links' },
 ]
+// A solo member has no group: one feed, their own links.
+const SOLO_TABS = [{ key: 'mine', label: 'Your links' }]
 
 export function ago(iso) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000
@@ -31,7 +33,9 @@ export function agoPhrase(iso) {
 export function Feed() {
   const { me, byId } = usePress()
   const [rows, setRows] = useState(null)
-  const [tab, setTab] = useState(() => { try { return localStorage.getItem('press-tab') || 'unread' } catch { return 'unread' } })
+  const [pickedTab, setTab] = useState(() => { try { return localStorage.getItem('press-tab') || 'unread' } catch { return 'unread' } })
+  const tab = me.solo ? 'mine' : pickedTab
+  const tabs = me.solo ? SOLO_TABS : TABS
   const [error, setError] = useState(null)
   const [adding, setAdding] = useState(false)
 
@@ -60,7 +64,7 @@ export function Feed() {
     setRows((rs) => rs && rs.map((r) => r.id !== a.id ? r : { ...r, status: 'pending', attempts: 0, fetch_error: null, claimed_at: null, queued_at: new Date().toISOString() }))
     retryFetch(a.id).catch(() => refresh())
   }, [refresh])
-  useEffect(() => { try { localStorage.setItem('press-tab', tab) } catch {} }, [tab])
+  useEffect(() => { try { localStorage.setItem('press-tab', pickedTab) } catch {} }, [pickedTab])
 
   /* Swipes: change the row locally first, then write. A failed write
    * reloads the feed so the screen never lies for long. */
@@ -160,7 +164,7 @@ export function Feed() {
     <main className="feed">
       <div className="tabs-row">
         <div className="tabs" role="tablist">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}>
               {t.label}<span className="count">{counts[t.key]}</span>
             </button>
@@ -174,7 +178,7 @@ export function Feed() {
       {visible.length === 0 && (
         <div className="feed-empty">
           {tab === 'unread' && 'Nothing unread. The group is quiet, or you are caught up.'}
-          {tab === 'mine' && 'Nothing here yet. Add a link and choose "Just me" to keep it off the group feed.'}
+          {tab === 'mine' && (me.solo ? 'Nothing here yet. Add a link and it lands here.' : 'Nothing here yet. Add a link and choose "Just me" to keep it off the group feed.')}
           {(tab === 'all' || tab === 'links') && 'Nothing here yet.'}
         </div>
       )}
@@ -202,7 +206,7 @@ export function Feed() {
 function AddSheet({ me, defaultScope, onClose, onDone }) {
   const [url, setUrl] = useState('')
   const [note, setNote] = useState('')
-  const [scope, setScope] = useState(defaultScope)
+  const [scope, setScope] = useState(me.solo ? 'personal' : defaultScope)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   useEffect(() => {
@@ -229,17 +233,17 @@ function AddSheet({ me, defaultScope, onClose, onDone }) {
         <label className="add-label">Link
           <input type="url" autoFocus required placeholder="https://" value={url} onChange={(e) => setUrl(e.target.value)} />
         </label>
-        <label className="add-label">A line for the others, optional
+        <label className="add-label">{me.solo ? 'A note to yourself, optional' : 'A line for the others, optional'}
           <input type="text" placeholder="Why this one" value={note} onChange={(e) => setNote(e.target.value)} maxLength={280} />
         </label>
-        <div className="scope" role="radiogroup" aria-label="Who sees it">
+        {!me.solo && <div className="scope" role="radiogroup" aria-label="Who sees it">
           <button type="button" role="radio" aria-checked={scope === 'group'} onClick={() => setScope('group')}>
             <b>Group feed</b><span>Everyone sees it, like a link in the chat.</span>
           </button>
           <button type="button" role="radio" aria-checked={scope === 'personal'} onClick={() => setScope('personal')}>
             <b>Just me</b><span>Lands under the "Just me" tab. Nobody else sees it.</span>
           </button>
-        </div>
+        </div>}
         {error && <div className="err">{error}</div>}
         <div className="add-actions">
           <button type="button" className="btn quiet" onClick={onClose}>Cancel</button>
@@ -397,7 +401,7 @@ function ActionSheet({ a, me, byId, fetch, onClose, onRead, onDismiss, onMine, o
   const deleteLabel = others.length ? 'Remove my share' : a.myGroupShares ? 'Delete for the group' : 'Delete'
   const deleteHint = others.length
     ? `${others.join(' and ')} sent it too, so it stays in the feed.`
-    : a.myGroupShares ? "Gone from everyone's feed." : 'Gone from your Just me tab.'
+    : a.myGroupShares ? "Gone from everyone's feed." : me.solo ? 'Gone from your feed.' : 'Gone from your Just me tab.'
   const mineHint = a.myGroupShares && !a.othersGroupShares
     ? 'Off the group feed for everyone, kept under your Just me tab.'
     : a.myGroupShares ? 'Your share goes private. The others still see theirs.' : 'Off your group tabs, under Just me. Nobody else notices.'
@@ -411,8 +415,8 @@ function ActionSheet({ a, me, byId, fetch, onClose, onRead, onDismiss, onMine, o
         {fetch?.retry && <button className="act" onClick={act(onRetry)}>Try again<span>Back to the front of the queue with a clean slate.</span></button>}
         {!a.isLink && <button className="act" onClick={act(onRead)}>{a.isRead ? 'Mark as unread' : 'Mark as read'}</button>}
         <button className="act" onClick={act(onDismiss)}>Dismiss<span>Hidden for you only.</span></button>
-        {a.inGroup && <button className="act" onClick={act(onMine)}>Move to Just me<span>{mineHint}</span></button>}
-        {backToGroup && (
+        {a.inGroup && !me.solo && <button className="act" onClick={act(onMine)}>Move to Just me<span>{mineHint}</span></button>}
+        {backToGroup && !me.solo && (
           <button className="act" onClick={act(onGroup)}>Move to the group feed<span>{a.myShares.some((s) => s.visibility === 'personal') ? 'Everyone sees it, like a link in the chat.' : 'Back on your group tabs.'}</span></button>
         )}
         {a.myShares.length > 0 && (confirm

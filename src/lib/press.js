@@ -4,7 +4,7 @@ import { supabase } from './supabase'
 import { canonicalize, siteOf, kindOf } from './url'
 
 export async function loadProfiles() {
-  const { data, error } = await supabase.from('profiles').select('id, user_id, display_name, short_name, color, is_me, avatar_url').order('created_at')
+  const { data, error } = await supabase.from('profiles').select('id, user_id, display_name, short_name, color, is_me, avatar_url, solo').order('created_at')
   if (error) throw error
   return data
 }
@@ -112,21 +112,16 @@ export function subscribeFeed(onChange) {
 export async function shareUrl(profileId, rawUrl, note, visibility = 'group') {
   const canon = canonicalize(rawUrl)
   const site = siteOf(canon)
-  let { data: art } = await supabase.from('articles').select('id').eq('canonical_url', canon).maybeSingle()
-  if (!art) {
-    const { data, error } = await supabase
-      .from('articles')
-      .insert({ canonical_url: canon, url: rawUrl, site, kind: kindOf(site) })
-      .select('id')
-      .single()
-    if (error) throw error
-    art = data
-  }
+  // Find-or-create as a definer: a solo member cannot see an article the group already has.
+  const { data: articleId, error: artError } = await supabase.rpc('press_ensure_article', {
+    p_canonical: canon, p_url: rawUrl, p_site: site, p_kind: kindOf(site),
+  })
+  if (artError) throw artError
   const { error } = await supabase.from('shares').insert({
-    article_id: art.id, profile_id: profileId, raw_url: rawUrl, note: note || null, source: 'app', visibility,
+    article_id: articleId, profile_id: profileId, raw_url: rawUrl, note: note || null, source: 'app', visibility,
   })
   if (error) throw error
-  return art.id
+  return articleId
 }
 
 /* Delete every share of mine on this article. If nobody else sent it, it

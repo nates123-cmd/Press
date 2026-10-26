@@ -3,7 +3,12 @@
  * Name a Press Gang member and invite them.
  *
  *   node scripts/invite.mjs "<display name>" <email> [<iMessage handle like +16175551234>] [<short name>]
+ *   node scripts/invite.mjs --solo "<display name>" <email> [<short name>]
  *   node scripts/invite.mjs --list
+ *
+ * --solo makes a member with a feed of their own, walled off from the group:
+ * they see only their own links, the group never sees theirs, and they stay
+ * off the sign-in faces (they use "Someone else" and their email).
  *
  * The poller already created a placeholder profile ("Friend 1234") for every
  * handle it saw in the chat, so pass the handle to rename that row and attach
@@ -30,12 +35,14 @@ const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) { console.error('need SUPABASE_URL and SUPABASE_SERVICE_KEY'); process.exit(2) }
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
 
-const [a, b, c, d] = process.argv.slice(2)
+const argv = process.argv.slice(2)
+const solo = argv.includes('--solo')
+const [a, b, c, d] = argv.filter((x) => x !== '--solo')
 
 if (a === '--list' || !a) {
-  const { data, error } = await sb.from('profiles').select('display_name, short_name, email, imessage_handle, user_id, color').order('created_at')
+  const { data, error } = await sb.from('profiles').select('display_name, short_name, email, imessage_handle, user_id, color, solo').order('created_at')
   if (error) throw error
-  for (const p of data) console.log(`${p.display_name.padEnd(22)} ${(p.short_name || '').padEnd(6)} ${(p.email || '(no email)').padEnd(30)} ${p.imessage_handle || ''}  ${p.user_id ? 'signed in' : 'not yet'}`)
+  for (const p of data) console.log(`${p.display_name.padEnd(22)} ${(p.short_name || '').padEnd(6)} ${(p.email || '(no email)').padEnd(30)} ${p.imessage_handle || ''}  ${p.user_id ? 'signed in' : 'not yet'}${p.solo ? '  solo' : ''}`)
   process.exit(0)
 }
 
@@ -55,6 +62,7 @@ if (!row) {
   row = data
 }
 const patch = { display_name: displayName, short_name: shortName, email }
+if (solo) patch.solo = true
 if (handle) patch.imessage_handle = handle
 if (row) {
   const { error } = await sb.from('profiles').update(patch).eq('id', row.id)
