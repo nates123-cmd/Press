@@ -7,8 +7,8 @@
  *   node scripts/invite.mjs --list
  *
  * --solo makes a member with a feed of their own, walled off from the group:
- * they see only their own links, the group never sees theirs, and they stay
- * off the sign-in faces (they use "Someone else" and their email).
+ * they see only their own links and the group never sees theirs. Their face
+ * is on the sign-in screen with everyone else's.
  *
  * The poller already created a placeholder profile ("Friend 1234") for every
  * handle it saw in the chat, so pass the handle to rename that row and attach
