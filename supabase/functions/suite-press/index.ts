@@ -1,6 +1,9 @@
 // suite-press: Press Gang for the native Suite app's home edition.
 //
-// Read-only. Returns what Press's own Unread tab would show Nate (src/components/Feed.jsx
+// POST {} (or no body): read-only summary. POST {action:"just_me", url, note?}: save a link as a
+// personal ("Just me") share, see justMe() below.
+//
+// The summary returns what Press's own Unread tab would show Nate (src/components/Feed.jsx
 // `decorated` + `unread`), plus new comments on group articles since he last looked.
 // Headline, site and who shared it only, never article text or share notes.
 //
@@ -75,10 +78,72 @@ async function feed() {
   };
 }
 
+// ── "Just me" from the Suite share sheet. Mirrors src/lib/press.js shareUrl() with
+// visibility 'personal'; canonicalize() mirrors src/lib/url.js (itself a mirror of the poller)
+// so the dedupe key matches every other way a link gets into Press. Keep all three in step. ──
+const TRACKERS = new Set([
+  "smid", "rsrc", "fbclid", "gclid", "igshid", "igsh", "si", "ref", "ref_src", "ref_url", "feature",
+  "mc_cid", "mc_eid", "unlocked_article_code", "campaign_id", "emc", "nl", "te", "referringsource",
+  "sgrp", "pvid", "ck", "ss", "user_id", "regi_id", "uri", "share", "cmpid", "ncid", "source", "s", "t",
+  "mibextid", "mkt_tok", "ito", "ocid", "cid", "xid", "via", "srsltid", "sfnsn", "rbclickid", "gift",
+  "giftcopy", "leadsource", "wt.mc_id", "searchresultposition", "stkn", "img_index", "partner", "sh", "ref_",
+]);
+const LINK_HOSTS = new Set([
+  "youtube.com", "youtu.be", "open.spotify.com", "x.com", "twitter.com", "instagram.com", "tiktok.com",
+  "podcasts.apple.com", "music.apple.com", "reddit.com", "imgur.com", "tenor.com", "giphy.com",
+  "apps.apple.com", "maps.app.goo.gl", "maps.google.com",
+]);
+
+function canonicalize(raw: string) {
+  const u = new URL(raw.trim());
+  let host = u.hostname.toLowerCase();
+  if (host.startsWith("www.")) host = host.slice(4);
+  if (host.startsWith("m.") && host.split(".").length >= 3) host = host.slice(2);
+  const path = u.pathname.replace(/\/+$/, "") || "/";
+  let keep: [string, string][] = [];
+  for (const [k, v] of u.searchParams) {
+    const kl = k.toLowerCase();
+    if (TRACKERS.has(kl) || kl.startsWith("utm_")) continue;
+    keep.push([k, v]);
+  }
+  if (host === "youtube.com") keep = keep.filter(([k]) => k === "v");
+  keep.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const q = new URLSearchParams(keep).toString();
+  return `https://${host}${path}${q ? "?" + q : ""}`;
+}
+
+async function justMe(rawUrl: string, note: string) {
+  if (!/^https?:\/\//i.test(rawUrl)) return json({ ok: false, error: "not a link" }, 400);
+  const canon = canonicalize(rawUrl);
+  const site = new URL(canon).hostname;
+  const { data: me } = await db.from("profiles").select("id").eq("is_me", true).single();
+  if (!me) return json({ ok: false, error: "no is_me profile" }, 500);
+
+  let { data: art } = await db.from("articles").select("id").eq("canonical_url", canon).maybeSingle();
+  if (!art) {
+    const { data, error } = await db.from("articles")
+      .insert({ canonical_url: canon, url: rawUrl, site, kind: LINK_HOSTS.has(site) ? "link" : "article" })
+      .select("id").single();
+    if (error) return json({ ok: false, error: error.message }, 500);
+    art = data;
+  }
+  const { data: dup } = await db.from("shares").select("id").eq("article_id", art!.id).eq("profile_id", me.id).limit(1);
+  if (dup?.length) return json({ ok: true, id: art!.id, message: "Already in Press" });
+
+  const { error } = await db.from("shares").insert({
+    article_id: art!.id, profile_id: me.id, raw_url: rawUrl, note: note || null, source: "app", visibility: "personal",
+  });
+  if (error) return json({ ok: false, error: error.message }, 500);
+  return json({ ok: true, id: art!.id, message: `Saved to Press (just you) · ${site}` });
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "POST only" }, 405);
   if (!sameToken(req.headers.get("x-suite-token") ?? "", TOKEN)) return json({ ok: false, error: "unauthorized" }, 401);
+  let body: any = {};
+  try { body = await req.json(); } catch { /* empty body = feed */ }
   try {
+    if (body.action === "just_me") return await justMe(String(body.url ?? ""), String(body.note ?? ""));
     return json({ ok: true, ...(await feed()) });
   } catch (e) {
     return json({ ok: false, error: String(e instanceof Error ? e.message : e) }, 500);
